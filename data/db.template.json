@@ -1,0 +1,43 @@
+{
+  "accounts": [],
+  "geminiKeys": [],
+  "automations": [],
+  "branding": {
+    "enabledOnAuto": true,
+    "offerOnManual": true,
+    "showAccountName": true,
+    "showTopBadge": false,
+    "showBottomBar": true,
+    "watermarkMode": "logo_stamp",
+    "logoUrl": "",
+    "customAccountNames": {},
+    "bottomText": "For more content, Like and Share",
+    "barColor": "#E60023",
+    "textColor": "#FFFFFF",
+    "font": "Poppins",
+    "look": "3D",
+    "headlineBanner": false
+  },
+  "posts": [],
+  "notifications": [
+    {
+      "id": "notif_welcome",
+      "type": "info",
+      "title": "Welcome to PostNova",
+      "message": "Connect your Facebook & Instagram accounts to start automated publishing.",
+      "createdAt": "2026-09-16T00:00:00.000Z"
+    }
+  ],
+  "driveSettings": {
+    "status": "disconnected",
+    "folderMappings": []
+  },
+  "scheduledQueue": [],
+  "autoDmRules": [],
+  "autoDmLogs": [],
+  "notificationPreferences": {
+    "postWentOut": true,
+    "postFailed": true,
+    "newsUpdates": true
+  }
+}

@@ -1,0 +1,220 @@
+import { NextResponse } from 'next/server';
+import { getDb, saveDb, PostRecord } from '@/lib/db';
+import { publishToFacebook, publishBufferToFacebook } from '@/lib/facebook';
+import { publishInstagramFeedPost } from '@/lib/instagram';
+import { processBrandedImageUrl } from '@/lib/image-banner';
+
+export async function GET() {
+  const db = getDb();
+  return NextResponse.json({ posts: db.posts });
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { accountId, message, link, imageUrl, applyBranding = true } = body;
+
+    const db = getDb();
+    const finalMessage = [message, link].filter(Boolean).join('\n\n');
+
+    if (accountId === 'both') {
+      const fbAccount = db.accounts.find((a) => a.platform === 'facebook');
+      const igAccount = db.accounts.find((a) => a.platform === 'instagram');
+
+      if (!fbAccount && !igAccount) {
+        return NextResponse.json({ error: 'No active accounts connected' }, { status: 400 });
+      }
+
+      const publishedIds: string[] = [];
+
+      // 1. Post to Facebook
+      if (fbAccount) {
+        let fbId = '';
+        if (imageUrl && applyBranding && db.branding) {
+          try {
+            const accountDisplayName = db.branding.customAccountNames?.[fbAccount.id] || fbAccount.name;
+            const brandedBuffer = await processBrandedImageUrl(imageUrl, {
+              title: '',
+              accountName: accountDisplayName,
+              bottomText: db.branding.bottomText,
+              barColor: db.branding.barColor,
+              textColor: db.branding.textColor,
+              font: db.branding.font,
+              look: db.branding.look,
+              headlineBanner: Boolean(db.branding.headlineBanner),
+              showTopBadge: Boolean(db.branding.showTopBadge),
+              showBottomBar: db.branding.showBottomBar !== false,
+              watermarkMode: db.branding.watermarkMode || 'logo_stamp',
+              logoUrl: db.branding.logoUrl,
+              pageId: fbAccount.pageId,
+            });
+            const res = await publishBufferToFacebook({
+              pageId: fbAccount.pageId,
+              pageToken: fbAccount.pageAccessToken,
+              buffer: brandedBuffer,
+              fileName: 'post.jpg',
+              mimeType: 'image/jpeg',
+              caption: finalMessage,
+            });
+            fbId = res.postId;
+          } catch (e) {
+            console.warn('Branded publish fallback:', e);
+          }
+        }
+        if (!fbId) {
+          const res = await publishToFacebook({
+            pageId: fbAccount.pageId,
+            pageToken: fbAccount.pageAccessToken,
+            message: finalMessage,
+            link: link || undefined,
+            imageUrl: imageUrl || undefined,
+          });
+          fbId = res.postId;
+        }
+        if (fbId) {
+          publishedIds.push(fbId);
+          db.posts.unshift({
+            id: 'post_' + Date.now() + '_fb',
+            accountName: fbAccount.name,
+            title: message?.slice(0, 50) || 'New Post',
+            caption: finalMessage,
+            imageUrl,
+            externalLink: link,
+            fbPostId: fbId,
+            status: 'live',
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      // 2. Post to Instagram
+      if (igAccount) {
+        if (!imageUrl) {
+          return NextResponse.json(
+            { error: 'Instagram feed posts strictly require an image URL.' },
+            { status: 400 }
+          );
+        }
+        const igUserId = igAccount.igUserId || igAccount.pageId;
+        const igRes = await publishInstagramFeedPost(igUserId, imageUrl, finalMessage, igAccount.pageAccessToken);
+        if (igRes.ok && igRes.postId) {
+          publishedIds.push(igRes.postId);
+          db.posts.unshift({
+            id: 'post_' + Date.now() + '_ig',
+            accountName: igAccount.username ? `@${igAccount.username}` : igAccount.name,
+            title: message?.slice(0, 50) || 'New Post',
+            caption: finalMessage,
+            imageUrl,
+            externalLink: link,
+            fbPostId: igRes.postId,
+            status: 'live',
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      saveDb({ posts: db.posts });
+      return NextResponse.json({
+        ok: true,
+        postId: publishedIds.join(', '),
+        platform: 'both',
+        accountName: 'Facebook & Instagram',
+      });
+    }
+
+    const account = db.accounts.find(
+      (a) => a.id === accountId || a.pageId === accountId || a.igUserId === accountId
+    );
+
+    if (!account) {
+      return NextResponse.json({ error: 'Selected account not found' }, { status: 404 });
+    }
+
+    let postId = '';
+
+    if (account.platform === 'instagram') {
+      if (!imageUrl) {
+        return NextResponse.json(
+          { error: 'Instagram feed posts strictly require an image URL.' },
+          { status: 400 }
+        );
+      }
+      const igUserId = account.igUserId || account.pageId;
+      const res = await publishInstagramFeedPost(igUserId, imageUrl, finalMessage, account.pageAccessToken);
+      if (!res.ok || !res.postId) {
+        return NextResponse.json({ error: res.error || 'Failed to post to Instagram' }, { status: 500 });
+      }
+      postId = res.postId;
+    } else {
+      // Facebook
+      if (imageUrl && applyBranding && db.branding) {
+        try {
+          const accountDisplayName = db.branding.customAccountNames?.[account.id] || account.name;
+          const brandedBuffer = await processBrandedImageUrl(imageUrl, {
+            title: '',
+            accountName: accountDisplayName,
+            bottomText: db.branding.bottomText,
+            barColor: db.branding.barColor,
+            textColor: db.branding.textColor,
+            font: db.branding.font,
+            look: db.branding.look,
+            headlineBanner: Boolean(db.branding.headlineBanner),
+            showTopBadge: Boolean(db.branding.showTopBadge),
+            showBottomBar: db.branding.showBottomBar !== false,
+            watermarkMode: db.branding.watermarkMode || 'logo_stamp',
+            logoUrl: db.branding.logoUrl,
+            pageId: account.pageId,
+          });
+          const res = await publishBufferToFacebook({
+            pageId: account.pageId,
+            pageToken: account.pageAccessToken,
+            buffer: brandedBuffer,
+            fileName: 'post.jpg',
+            mimeType: 'image/jpeg',
+            caption: finalMessage,
+          });
+          postId = res.postId;
+        } catch (e) {
+          console.warn('Branded publish fallback to standard:', e);
+        }
+      }
+
+      if (!postId) {
+        const res = await publishToFacebook({
+          pageId: account.pageId,
+          pageToken: account.pageAccessToken,
+          message: finalMessage,
+          link: link || undefined,
+          imageUrl: imageUrl || undefined,
+        });
+        postId = res.postId;
+      }
+    }
+
+    // Record post
+    const newPost: PostRecord = {
+      id: 'post_' + Date.now(),
+      accountName: account.username ? `@${account.username}` : account.name,
+      title: message?.slice(0, 50) || 'New Post',
+      caption: finalMessage,
+      imageUrl,
+      externalLink: link,
+      fbPostId: postId,
+      status: 'live',
+      createdAt: new Date().toISOString(),
+    };
+    db.posts.unshift(newPost);
+    account.lastPostedAt = new Date().toISOString();
+    saveDb({ posts: db.posts, accounts: db.accounts });
+
+    return NextResponse.json({ ok: true, postId, platform: account.platform });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Post failed' }, { status: 500 });
+  }
+}
+
+export async function DELETE() {
+  saveDb({ posts: [] });
+  return NextResponse.json({ ok: true });
+}
+
