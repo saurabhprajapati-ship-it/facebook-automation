@@ -1,23 +1,66 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { getDbFromReq, saveDbAsync } from '@/lib/db';
+import { getUserFromReq } from '@/lib/auth-db';
 
-export async function GET() {
-  const db = getDb();
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
+  const user = await getUserFromReq(req);
+  const db = await getDbFromReq(req);
+
+  const isAdmin =
+    user?.role === 'admin' ||
+    user?.email === 'saurabhprajapatidev@gmail.com' ||
+    user?.id === 'usr_admin_saurabh';
+
+  let notifications = db.notifications || [];
+  if (user) {
+    if (isAdmin) {
+      notifications = notifications.filter(
+        (n) => !n.userId || n.userId === user.id || n.userId === 'usr_admin_saurabh'
+      );
+    } else {
+      notifications = notifications.filter((n) => n.userId === user.id);
+    }
+  } else {
+    notifications = [];
+  }
+
   return NextResponse.json({
-    notifications: db.notifications,
+    notifications,
     preferences: db.notificationPreferences,
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    },
   });
 }
 
 export async function POST(req: Request) {
   try {
+    const user = await getUserFromReq(req);
     const body = await req.json();
     const { action, preferences } = body;
-    const db = getDb();
+    const db = await getDbFromReq(req);
+
+    const isAdmin =
+      user?.role === 'admin' ||
+      user?.email === 'saurabhprajapatidev@gmail.com' ||
+      user?.id === 'usr_admin_saurabh';
 
     if (action === 'clear') {
-      db.notifications = [];
-      saveDb({ notifications: [] });
+      let remaining = db.notifications || [];
+      if (user) {
+        if (isAdmin) {
+          remaining = remaining.filter(
+            (n) => n.userId && n.userId !== user.id && n.userId !== 'usr_admin_saurabh'
+          );
+        } else {
+          remaining = remaining.filter((n) => n.userId !== user.id);
+        }
+      }
+      db.notifications = remaining;
+      await saveDbAsync({ notifications: remaining });
       return NextResponse.json({ ok: true });
     }
 
@@ -26,7 +69,7 @@ export async function POST(req: Request) {
         ...db.notificationPreferences,
         ...preferences,
       };
-      saveDb({ notificationPreferences: db.notificationPreferences });
+      await saveDbAsync({ notificationPreferences: db.notificationPreferences });
       return NextResponse.json({ ok: true, preferences: db.notificationPreferences });
     }
 

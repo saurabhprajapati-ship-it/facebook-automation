@@ -22,6 +22,7 @@ export interface Account {
 
 export interface GeminiKey {
   id: string;
+  userId?: string;
   key: string;
   maskedKey: string;
   models: string[];
@@ -90,6 +91,7 @@ export interface PostRecord {
 
 export interface NotificationItem {
   id: string;
+  userId?: string;
   type: 'live' | 'failed' | 'info';
   title: string;
   message: string;
