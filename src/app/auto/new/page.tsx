@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, Rss, ArrowLeft, Zap } from 'lucide-react';
 import { Account } from '@/lib/db';
+import { InstagramIcon, FacebookIcon } from '@/components/BrandIcons';
 
 function NewAutoPostContent() {
   const router = useRouter();
@@ -452,19 +453,35 @@ function NewAutoPostContent() {
                         }}
                         className="w-4 h-4 rounded text-amber-500 focus:ring-brand-yellow"
                       />
-                      <div
-                        className={`w-7 h-7 rounded-full text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${
-                          isIg ? 'bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600' : 'bg-blue-600'
-                        }`}
-                      >
-                        {isIg ? '📸' : 'f'}
+                      <div className="relative shrink-0">
+                        {acc.profilePictureUrl ? (
+                          <img
+                            src={acc.profilePictureUrl}
+                            alt={acc.name}
+                            className="w-8 h-8 rounded-full object-cover border border-amber-300 dark:border-amber-500 shadow-2xs"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className={`w-8 h-8 rounded-full text-white flex items-center justify-center font-bold text-xs shadow-2xs ${
+                              isIg ? 'bg-linear-to-tr from-amber-500 via-rose-500 to-purple-600' : 'bg-blue-600'
+                            }`}
+                          >
+                            {acc.name ? acc.name.charAt(0).toUpperCase() : 'A'}
+                          </div>
+                        )}
+                        <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-white dark:bg-stone-800 p-0.5 shadow-2xs flex items-center justify-center">
+                          {isIg ? <InstagramIcon className="w-2.5 h-2.5" /> : <FacebookIcon className="w-2.5 h-2.5" />}
+                        </div>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-stone-900 truncate">
-                          {isIg ? `📸 Instagram: ${acc.name} (@${acc.username || acc.name})` : `🟦 Facebook: ${acc.name}`}
+                        <p className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">
+                          {acc.name}
                         </p>
-                        <p className="text-[10px] text-stone-500 font-medium">
-                          {isIg ? 'Instagram Professional Account' : 'Facebook Page'}
+                        <p className="text-[10px] text-stone-500 dark:text-stone-400 font-medium truncate">
+                          {isIg ? (acc.username ? `@${acc.username}` : 'Instagram Professional') : 'Facebook Page'}
                         </p>
                       </div>
                     </label>

@@ -3,12 +3,27 @@ import { getDbFromReq, saveDbAsync, extractDriveFromReq, PostRecord } from '@/li
 import { publishToFacebook, publishBufferToFacebook } from '@/lib/facebook';
 import { publishInstagramFeedPost, uploadBufferToMetaCdn } from '@/lib/instagram';
 import { processBrandedImageUrl } from '@/lib/image-banner';
+import { getUserFromReq } from '@/lib/auth-db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+  const user = await getUserFromReq(req);
   const db = await getDbFromReq(req);
-  return NextResponse.json({ posts: db.posts }, {
+
+  let posts = db.posts || [];
+  if (user) {
+    const isAdmin = user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
+    if (isAdmin) {
+      posts = posts.filter((p) => !p.userId || p.userId === user.id || p.userId === 'usr_admin_saurabh');
+    } else {
+      posts = posts.filter((p) => p.userId === user.id);
+    }
+  } else {
+    posts = [];
+  }
+
+  return NextResponse.json({ posts }, {
     headers: {
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
     },
@@ -17,6 +32,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const user = await getUserFromReq(req);
+    const activeUserId = user ? user.id : 'usr_admin_saurabh';
     const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { accountId, message, link, imageUrl, applyBranding = true } = body;
@@ -82,6 +99,7 @@ export async function POST(req: Request) {
           publishedIds.push(fbId);
           db.posts.unshift({
             id: 'post_' + Date.now() + '_fb',
+            userId: activeUserId,
             accountName: fbAccount.name,
             title: message?.slice(0, 50) || 'New Post',
             caption: finalMessage,
@@ -138,6 +156,7 @@ export async function POST(req: Request) {
           publishedIds.push(igRes.postId);
           db.posts.unshift({
             id: 'post_' + Date.now() + '_ig',
+            userId: activeUserId,
             accountName: igAccount.username ? `@${igAccount.username}` : igAccount.name,
             title: message?.slice(0, 50) || 'New Post',
             caption: finalMessage,
@@ -261,6 +280,7 @@ export async function POST(req: Request) {
     // Record post
     const newPost: PostRecord = {
       id: 'post_' + Date.now(),
+      userId: activeUserId,
       accountName: account.username ? `@${account.username}` : account.name,
       title: message?.slice(0, 50) || 'New Post',
       caption: finalMessage,
@@ -281,8 +301,14 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const user = await getUserFromReq(req);
   const driveCreds = extractDriveFromReq(req);
-  await saveDbAsync({ posts: [] }, driveCreds);
+  const db = await getDbFromReq(req);
+
+  const isAdmin = !user || user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
+  const remainingPosts = isAdmin ? [] : (db.posts || []).filter((p) => p.userId !== user.id);
+
+  await saveDbAsync({ posts: remainingPosts }, driveCreds);
   return NextResponse.json({ ok: true });
 }
 

@@ -1,12 +1,31 @@
 import { NextResponse } from 'next/server';
 import { getDbFromReq, saveDbAsync, extractDriveFromReq, Account } from '@/lib/db';
 import { fetchAccountsFromSystemUser, checkFacebookPage } from '@/lib/facebook';
+import { getUserFromReq } from '@/lib/auth-db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+  const user = await getUserFromReq(req);
   const db = await getDbFromReq(req);
-  const accountsWithPics = (db.accounts || []).map((acc) => {
+
+  let rawAccounts = db.accounts || [];
+
+  if (user) {
+    const isAdmin = user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
+    if (isAdmin) {
+      // Admin sees admin accounts and legacy accounts
+      rawAccounts = rawAccounts.filter((a) => !a.userId || a.userId === user.id || a.userId === 'usr_admin_saurabh');
+    } else {
+      // Regular users only see their own accounts
+      rawAccounts = rawAccounts.filter((a) => a.userId === user.id);
+    }
+  } else {
+    // If accessed without session, return empty
+    rawAccounts = [];
+  }
+
+  const accountsWithPics = rawAccounts.map((acc) => {
     if (acc.platform === 'facebook' && !acc.profilePictureUrl && acc.pageId) {
       return {
         ...acc,
@@ -82,9 +101,13 @@ export async function POST(req: Request) {
     }
 
     // Check if account already exists
+    const user = await getUserFromReq(req);
+    const activeUserId = user ? user.id : 'usr_admin_saurabh';
+
     const existingIndex = db.accounts.findIndex((a) => a.pageId === finalPageId);
     const newAccount: Account = {
       id: existingIndex >= 0 ? db.accounts[existingIndex].id : 'acc_' + Date.now(),
+      userId: activeUserId,
       platform: 'facebook',
       pageId: finalPageId,
       name: pageName,
@@ -109,13 +132,21 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const user = await getUserFromReq(req);
   const driveCreds = extractDriveFromReq(req);
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
   const db = await getDbFromReq(req);
-  const updated = db.accounts.filter((a) => a.id !== id);
+  const isAdmin = !user || user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
+
+  const updated = db.accounts.filter((a) => {
+    if (a.id !== id) return true;
+    // Allow deletion if admin or if account belongs to this user
+    return !isAdmin && user && a.userId !== user.id;
+  });
+
   await saveDbAsync({ accounts: updated }, driveCreds);
   return NextResponse.json({ ok: true });
 }

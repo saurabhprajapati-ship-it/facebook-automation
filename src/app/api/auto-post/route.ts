@@ -1,13 +1,34 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, Automation } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq, Automation } from '@/lib/db';
+import { getUserFromReq } from '@/lib/auth-db';
 
-export async function GET() {
-  const db = getDb();
-  return NextResponse.json({ automations: db.automations });
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
+  const user = await getUserFromReq(req);
+  const db = await getDbFromReq(req);
+  let automations = db.automations || [];
+
+  if (user) {
+    const isAdmin = user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
+    if (isAdmin) {
+      automations = automations.filter((a) => !a.userId || a.userId === user.id || a.userId === 'usr_admin_saurabh');
+    } else {
+      automations = automations.filter((a) => a.userId === user.id);
+    }
+  } else {
+    automations = [];
+  }
+
+  return NextResponse.json({ automations });
 }
 
 export async function POST(req: Request) {
   try {
+    const user = await getUserFromReq(req);
+    const activeUserId = user ? user.id : 'usr_admin_saurabh';
+    const driveCreds = extractDriveFromReq(req);
+
     const body = await req.json();
     const {
       name,
@@ -32,9 +53,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     const newAuto: Automation = {
       id: 'auto_' + Date.now(),
+      userId: activeUserId,
       name,
       kind,
       enabled: true,
@@ -56,7 +78,7 @@ export async function POST(req: Request) {
     };
 
     db.automations.push(newAuto);
-    saveDb({ automations: db.automations });
+    await saveDbAsync({ automations: db.automations }, driveCreds);
 
     return NextResponse.json({ ok: true, automation: newAuto });
   } catch (err: any) {
@@ -66,16 +88,17 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { id, enabled } = body;
     if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     const auto = db.automations.find((a) => a.id === id);
     if (!auto) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     if (enabled !== undefined) auto.enabled = enabled;
-    saveDb({ automations: db.automations });
+    await saveDbAsync({ automations: db.automations }, driveCreds);
 
     return NextResponse.json({ ok: true, automation: auto });
   } catch (err: any) {
@@ -84,12 +107,13 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const driveCreds = extractDriveFromReq(req);
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-  const db = getDb();
+  const db = await getDbFromReq(req);
   const updated = db.automations.filter((a) => a.id !== id);
-  saveDb({ automations: updated });
+  await saveDbAsync({ automations: updated }, driveCreds);
   return NextResponse.json({ ok: true });
 }

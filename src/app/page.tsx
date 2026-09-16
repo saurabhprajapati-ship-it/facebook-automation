@@ -33,17 +33,29 @@ export default function HomePage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState('Naveed');
+  const [userName, setUserName] = useState('Saurabh');
 
   useEffect(() => {
-    // Dynamic user session
-    try {
-      const savedUser = localStorage.getItem('postnova_user');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        if (parsed?.name) setUserName(parsed.name);
-      }
-    } catch {}
+    // Dynamic user session from /api/auth/me
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user?.name) {
+          setUserName(data.user.name);
+          try {
+            localStorage.setItem('postnova_user', JSON.stringify(data.user));
+          } catch {}
+        }
+      })
+      .catch(() => {
+        try {
+          const savedUser = localStorage.getItem('postnova_user');
+          if (savedUser) {
+            const parsed = JSON.parse(savedUser);
+            if (parsed?.name) setUserName(parsed.name);
+          }
+        } catch {}
+      });
 
     Promise.all([
       fetchWithDrive('/api/accounts').then((r) => r.json()),
@@ -179,7 +191,25 @@ export default function HomePage() {
           {/* Facebook Page Card */}
           <div className="bg-white dark:bg-stone-800/90 rounded-3xl p-5 border border-cream-200/80 dark:border-stone-700/80 shadow-soft hover:shadow-xl hover:shadow-blue-500/10 hover:border-blue-400/50 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between h-48 relative overflow-hidden group">
             <div className="flex justify-between items-start">
-              <FacebookIcon className="w-12 h-12 shadow-sm rounded-full group-hover:scale-105 transition-transform" />
+              <div className="relative">
+                {fbAccounts[0]?.profilePictureUrl ? (
+                  <img
+                    src={fbAccounts[0].profilePictureUrl}
+                    alt={fbAccounts[0].name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-amber-300 dark:border-amber-500 shadow-sm"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <FacebookIcon className="w-12 h-12 shadow-sm rounded-full group-hover:scale-105 transition-transform" />
+                )}
+                {fbAccounts.length > 0 && fbAccounts[0]?.profilePictureUrl && (
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white dark:bg-stone-800 p-0.5 shadow-xs flex items-center justify-center">
+                    <FacebookIcon className="w-3.5 h-3.5" />
+                  </div>
+                )}
+              </div>
               <span
                 className={`px-3 py-1 rounded-full text-[11px] font-bold ${
                   fbAccounts.length > 0
@@ -211,7 +241,25 @@ export default function HomePage() {
           {/* Instagram Card */}
           <div className="bg-white dark:bg-stone-800/90 rounded-3xl p-5 border border-cream-200/80 dark:border-stone-700/80 shadow-soft hover:shadow-xl hover:shadow-pink-500/10 hover:border-pink-400/50 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between h-48 relative overflow-hidden group">
             <div className="flex justify-between items-start">
-              <InstagramIcon className="w-12 h-12 shadow-sm rounded-2xl group-hover:scale-105 transition-transform" />
+              <div className="relative">
+                {igAccounts[0]?.profilePictureUrl ? (
+                  <img
+                    src={igAccounts[0].profilePictureUrl}
+                    alt={igAccounts[0].name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-amber-300 dark:border-amber-500 shadow-sm"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <InstagramIcon className="w-12 h-12 shadow-sm rounded-2xl group-hover:scale-105 transition-transform" />
+                )}
+                {igAccounts.length > 0 && igAccounts[0]?.profilePictureUrl && (
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white dark:bg-stone-800 p-0.5 shadow-xs flex items-center justify-center">
+                    <InstagramIcon className="w-3.5 h-3.5" />
+                  </div>
+                )}
+              </div>
               <span
                 className={`px-3 py-1 rounded-full text-[11px] font-bold ${
                   igAccounts.length > 0

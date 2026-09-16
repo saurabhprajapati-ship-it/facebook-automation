@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Account } from '@/lib/db';
 import { fetchWithDrive } from '@/lib/client-drive';
+import { InstagramIcon, FacebookIcon } from '@/components/BrandIcons';
 
 export default function InstagramAccountsPage() {
   const [igAccounts, setIgAccounts] = useState<Account[]>([]);
@@ -135,23 +136,19 @@ export default function InstagramAccountsPage() {
   return (
     <div className="space-y-6 max-w-5xl animate-fadeIn">
       {/* Platform Switcher Tabs */}
-      <div className="flex items-center gap-2 p-1.5 bg-cream-200/60 rounded-2xl w-fit border border-cream-200">
+      <div className="flex items-center gap-2 p-1.5 bg-cream-200/60 dark:bg-stone-800/80 rounded-2xl w-fit border border-cream-200 dark:border-stone-700">
         <Link
           href="/accounts/facebook"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-stone-600 hover:text-stone-900 transition-all"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-all"
         >
-          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-black">
-            f
-          </div>
+          <FacebookIcon className="w-4 h-4" />
           Facebook Pages
         </Link>
         <Link
           href="/accounts/instagram"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white text-stone-900 shadow-sm border border-stone-200/70"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs border border-stone-200/70 dark:border-stone-600"
         >
-          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center text-xs">
-            <Instagram className="w-3 h-3" />
-          </div>
+          <InstagramIcon className="w-4 h-4" />
           Instagram Accounts
         </Link>
       </div>
@@ -159,12 +156,12 @@ export default function InstagramAccountsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center font-black text-2xl shadow-sm shrink-0">
-            <Instagram className="w-6 h-6" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center p-2.5 shadow-md shrink-0">
+            <InstagramIcon className="w-full h-full text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-stone-900 tracking-tight">Instagram Business</h1>
-            <p className="text-stone-500 font-medium text-xs">
+            <h1 className="text-2xl font-black text-stone-900 dark:text-white tracking-tight">Instagram Business</h1>
+            <p className="text-stone-500 dark:text-stone-400 font-medium text-xs">
               Automate Comment-to-DM link delivery, public replies, and stories with 0% ban risk.
             </p>
           </div>

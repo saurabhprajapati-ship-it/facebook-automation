@@ -4,6 +4,7 @@ import { saveFullDriveDatabase, readFullDriveDatabase } from './google-drive';
 
 export interface Account {
   id: string;
+  userId?: string;
   platform: 'facebook' | 'instagram' | 'twitter' | 'pinterest' | 'telegram' | 'tiktok';
   pageId: string;
   name: string;
@@ -32,6 +33,7 @@ export interface GeminiKey {
 
 export interface Automation {
   id: string;
+  userId?: string;
   name: string;
   kind: 'ai' | 'feed';
   enabled: boolean;
@@ -73,6 +75,7 @@ export interface BrandingSettings {
 
 export interface PostRecord {
   id: string;
+  userId?: string;
   automationId?: string;
   accountName: string;
   title: string;
@@ -114,6 +117,7 @@ export interface DriveSettings {
 
 export interface ScheduledPostItem {
   id: string;
+  userId?: string;
   batchId: string;
   order: number;
   fileName: string;

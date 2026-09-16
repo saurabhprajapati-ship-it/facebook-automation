@@ -42,7 +42,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [currentUser, setCurrentUser] = useState({ name: 'Naveed', email: 'shahtube100@gmail.com' });
+  const [currentUser, setCurrentUser] = useState({ name: 'Saurabh', email: 'saurabhprajapatidev@gmail.com' });
 
   useEffect(() => {
     // Notifications check
@@ -66,14 +66,30 @@ export default function Sidebar() {
       setIsDarkMode(false);
     }
 
-    // User session
-    try {
-      const savedUser = localStorage.getItem('postnova_user');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        if (parsed?.name) setCurrentUser(parsed);
-      }
-    } catch {}
+    // User session verification from server
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user) {
+          setCurrentUser(data.user);
+          try {
+            localStorage.setItem('postnova_user', JSON.stringify(data.user));
+          } catch {}
+        } else {
+          if (pathname !== '/login') {
+            window.location.href = '/login';
+          }
+        }
+      })
+      .catch(() => {
+        try {
+          const savedUser = localStorage.getItem('postnova_user');
+          if (savedUser) {
+            const parsed = JSON.parse(savedUser);
+            if (parsed?.name) setCurrentUser(parsed);
+          }
+        } catch {}
+      });
   }, [pathname]);
 
   const toggleTheme = () => {
@@ -88,8 +104,9 @@ export default function Sidebar() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (confirm('Do you want to log out of PostNova?')) {
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
       localStorage.removeItem('postnova_user');
       window.location.href = '/login';
     }
@@ -114,11 +131,16 @@ export default function Sidebar() {
         <nav className="space-y-1">
           {MENU_ITEMS.map((item) => {
             const Icon = item.icon;
+            const isWebsiteFeed = typeof window !== 'undefined' && window.location.search.includes('kind=feed');
             const isActive =
               item.href === '/'
                 ? pathname === '/'
                 : item.href.startsWith('/accounts')
                 ? pathname.startsWith('/accounts')
+                : item.href === '/auto'
+                ? pathname === '/auto' && !isWebsiteFeed
+                : item.href === '/auto/new?kind=feed'
+                ? pathname.startsWith('/auto/new') && isWebsiteFeed
                 : pathname.startsWith(item.href.split('?')[0]);
 
             return (

@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getDbFromReq, saveDbAsync, extractDriveFromReq, ScheduledPostItem } from '@/lib/db';
 import { saveDriveDatabase } from '@/lib/google-drive';
+import { getUserFromReq } from '@/lib/auth-db';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
+    const user = await getUserFromReq(req);
+    const activeUserId = user ? user.id : 'usr_admin_saurabh';
+
     const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { slots, driveFolderId, replaceExisting = false } = body;
@@ -26,7 +30,8 @@ export async function POST(req: Request) {
     }
 
     // Merge new slots into queue
-    const updatedQueue: ScheduledPostItem[] = [...currentQueue, ...slots];
+    const taggedSlots = slots.map((s: any) => ({ ...s, userId: activeUserId }));
+    const updatedQueue: ScheduledPostItem[] = [...currentQueue, ...taggedSlots];
 
     const targetFolder = driveFolderId || driveCreds.folderId || db.driveSettings?.mainFolderId;
     const credsToUse = {

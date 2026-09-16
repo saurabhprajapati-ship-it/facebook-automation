@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { PenSquare, Send, Image as ImageIcon, Link as LinkIcon, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Account } from '@/lib/db';
+import AccountSelector from '@/components/AccountSelector';
 
 export default function NewPostComposerPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -117,29 +118,11 @@ export default function NewPostComposerPage() {
               No accounts connected yet. Go to <a href="/accounts/facebook" className="font-bold underline text-blue-600">Accounts</a> to add your Facebook Page or Instagram.
             </div>
           ) : (
-            <select
-              value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs font-bold text-stone-900 bg-white focus:ring-2 focus:ring-brand-yellow focus:outline-none"
-            >
-              {accounts
-                .filter((a) => a.platform === 'instagram')
-                .map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    📸 Instagram: {acc.name} (@{acc.username || acc.name})
-                  </option>
-                ))}
-              {accounts
-                .filter((a) => a.platform === 'facebook')
-                .map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    🟦 Facebook: {acc.name}
-                  </option>
-                ))}
-              <option value="both">
-                🌐 Both Facebook & Instagram (Ek sath dono par)
-              </option>
-            </select>
+            <AccountSelector
+              accounts={accounts}
+              selectedId={selectedAccountId}
+              onSelect={setSelectedAccountId}
+            />
           )}
         </div>
 

@@ -5,14 +5,29 @@ import {
   verifyInstagramAccount,
   InstagramAccountInfo,
 } from '@/lib/instagram';
+import { getUserFromReq } from '@/lib/auth-db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
+    const user = await getUserFromReq(req);
     const db = await getDbFromReq(req);
-    const instagramAccounts = db.accounts.filter((a) => a.platform === 'instagram');
-    const facebookAccounts = db.accounts.filter((a) => a.platform === 'facebook');
+
+    let rawAccounts = db.accounts || [];
+    if (user) {
+      const isAdmin = user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
+      if (isAdmin) {
+        rawAccounts = rawAccounts.filter((a) => !a.userId || a.userId === user.id || a.userId === 'usr_admin_saurabh');
+      } else {
+        rawAccounts = rawAccounts.filter((a) => a.userId === user.id);
+      }
+    } else {
+      rawAccounts = [];
+    }
+
+    const instagramAccounts = rawAccounts.filter((a) => a.platform === 'instagram');
+    const facebookAccounts = rawAccounts.filter((a) => a.platform === 'facebook');
 
     // Attempt auto-discovery from connected Facebook Pages
     const discovered: (InstagramAccountInfo & { fbPageName: string })[] = [];
@@ -68,8 +83,12 @@ export async function POST(req: Request) {
         );
       }
 
+      const user = await getUserFromReq(req);
+      const activeUserId = user ? user.id : 'usr_admin_saurabh';
+
       accountToAdd = {
         id: 'acc_ig_' + discovered.id,
+        userId: activeUserId,
         platform: 'instagram',
         pageId: fb.pageId,
         igUserId: discovered.id,
@@ -92,8 +111,12 @@ export async function POST(req: Request) {
         );
       }
 
+      const user = await getUserFromReq(req);
+      const activeUserId = user ? user.id : 'usr_admin_saurabh';
+
       accountToAdd = {
         id: 'acc_ig_' + verified.info.id,
+        userId: activeUserId,
         platform: 'instagram',
         pageId: verified.info.pageId || igUserId,
         igUserId: verified.info.id,

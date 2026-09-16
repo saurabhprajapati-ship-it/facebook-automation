@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Check, Trash2, AlertTriangle, ShieldCheck, CheckCircle2, Instagram } from 'lucide-react';
 import { Account } from '@/lib/db';
 import { fetchWithDrive } from '@/lib/client-drive';
+import { FacebookIcon, InstagramIcon } from '@/components/BrandIcons';
 
 export default function FacebookAccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -71,35 +72,31 @@ export default function FacebookAccountsPage() {
   return (
     <div className="space-y-6 max-w-5xl animate-fadeIn">
       {/* Platform Switcher Tabs */}
-      <div className="flex items-center gap-2 p-1.5 bg-cream-200/60 rounded-2xl w-fit border border-cream-200">
+      <div className="flex items-center gap-2 p-1.5 bg-cream-200/60 dark:bg-stone-800/80 rounded-2xl w-fit border border-cream-200 dark:border-stone-700">
         <Link
           href="/accounts/facebook"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white text-stone-900 shadow-sm border border-stone-200/70"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs border border-stone-200/70 dark:border-stone-600"
         >
-          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-black">
-            f
-          </div>
+          <FacebookIcon className="w-4 h-4" />
           Facebook Pages
         </Link>
         <Link
           href="/accounts/instagram"
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-stone-600 hover:text-stone-900 transition-all"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-all"
         >
-          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center text-xs">
-            <Instagram className="w-3 h-3" />
-          </div>
+          <InstagramIcon className="w-4 h-4" />
           Instagram Accounts
         </Link>
       </div>
 
       {/* Page Header */}
       <div className="flex items-center gap-3.5">
-        <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-2xl shadow-sm shrink-0">
-          f
+        <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md shrink-0">
+          <FacebookIcon className="w-7 h-7" />
         </div>
         <div>
-          <h1 className="text-2xl font-black text-stone-900 tracking-tight">Facebook Page</h1>
-          <p className="text-stone-500 font-medium text-xs">
+          <h1 className="text-2xl font-black text-stone-900 dark:text-white tracking-tight">Facebook Page</h1>
+          <p className="text-stone-500 dark:text-stone-400 font-medium text-xs">
             Post to your Facebook Page with a System User token.
           </p>
         </div>
@@ -257,23 +254,43 @@ export default function FacebookAccountsPage() {
                 {fbAccounts.map((acc) => (
                   <div
                     key={acc.id}
-                    className="p-3.5 rounded-2xl border border-cream-200 bg-cream-50/50 space-y-2 hover:bg-white transition"
+                    className="p-3.5 rounded-2xl border border-cream-200 dark:border-stone-700 bg-cream-50/50 dark:bg-stone-800/50 space-y-2 hover:bg-white dark:hover:bg-stone-800 transition"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                        <h4 className="font-bold text-xs text-stone-900">{acc.name}</h4>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative shrink-0">
+                          {acc.profilePictureUrl ? (
+                            <img
+                              src={acc.profilePictureUrl}
+                              alt={acc.name}
+                              className="w-8 h-8 rounded-full object-cover border border-amber-300 dark:border-amber-500 shadow-2xs"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                              {acc.name ? acc.name.charAt(0).toUpperCase() : 'F'}
+                            </div>
+                          )}
+                          <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-white dark:bg-stone-800 p-0.5 shadow-2xs flex items-center justify-center">
+                            <FacebookIcon className="w-2.5 h-2.5" />
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-xs text-stone-900 dark:text-stone-100 truncate">{acc.name}</h4>
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Active & Ready</span>
+                        </div>
                       </div>
                       <button
                         onClick={() => handleDelete(acc.id)}
-                        className="p-1.5 text-stone-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                        className="p-1.5 text-stone-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="text-[11px] text-stone-500 space-y-0.5 font-mono">
+                    <div className="text-[11px] text-stone-500 dark:text-stone-400 space-y-0.5 font-mono pt-1 border-t border-cream-200/40 dark:border-stone-700/50">
                       <p>Page ID: {acc.pageId}</p>
-                      <p className="text-emerald-700 font-semibold font-sans">Active & Ready</p>
                     </div>
                   </div>
                 ))}

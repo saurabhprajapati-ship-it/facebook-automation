@@ -23,6 +23,7 @@ import {
   X,
   FileText,
 } from 'lucide-react';
+import AccountSelector from '@/components/AccountSelector';
 import { Account, AutoDmRule, AutoDmLog } from '@/lib/db';
 
 export default function InboxDashboardPage() {
@@ -753,26 +754,12 @@ export default function InboxDashboardPage() {
 
           <form onSubmit={handlePublishStory} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-stone-700 mb-1">Select Story Platform / Account</label>
-              <select
-                value={storyAccount}
-                onChange={(e) => setStoryAccount(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-cream-300 text-xs font-bold text-stone-900 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-              >
-                {allAccounts.filter((a) => a.platform === 'instagram').map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    📸 Instagram: {acc.name} (@{acc.username || acc.name})
-                  </option>
-                ))}
-                {allAccounts.filter((a) => a.platform === 'facebook').map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    🟦 Facebook: {acc.name}
-                  </option>
-                ))}
-                <option value="both">
-                  🌐 Both Facebook & Instagram (Ek sath dono par)
-                </option>
-              </select>
+              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1.5">Select Story Platform / Account</label>
+              <AccountSelector
+                accounts={allAccounts}
+                selectedId={storyAccount}
+                onSelect={setStoryAccount}
+              />
             </div>
 
             <div>
@@ -858,18 +845,12 @@ export default function InboxDashboardPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-stone-700 mb-1">Target Instagram Account</label>
-                <select
-                  value={targetAccountId}
-                  onChange={(e) => setTargetAccountId(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-cream-300 text-xs font-medium focus:ring-2 focus:ring-amber-400"
-                >
-                  {igAccounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.username ? `@${acc.username}` : acc.name}
-                    </option>
-                  ))}
-                </select>
+                <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1.5">Target Instagram Account</label>
+                <AccountSelector
+                  accounts={igAccounts}
+                  selectedId={targetAccountId}
+                  onSelect={setTargetAccountId}
+                />
               </div>
 
               <div>

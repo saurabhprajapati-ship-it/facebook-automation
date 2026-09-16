@@ -12,14 +12,12 @@ export async function GET(req: Request) {
     const users = await getMasterUsers();
 
     if (!sessionId) {
-      // Default to first admin if no cookie
-      const defaultUser = users[0] || { name: 'Admin', email: 'admin@postnova.app', role: 'admin' };
-      return NextResponse.json({ user: defaultUser });
+      return NextResponse.json({ user: null });
     }
 
     const user = users.find((u) => u.id === sessionId);
     if (!user) {
-      return NextResponse.json({ user: users[0] || null });
+      return NextResponse.json({ user: null });
     }
 
     return NextResponse.json({

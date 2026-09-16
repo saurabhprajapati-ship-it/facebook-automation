@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import Sidebar from '@/components/Sidebar';
+import AppShell from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'PostNova - Facebook Automation & Bulk Scheduler',
@@ -14,11 +14,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-cream-100 text-stone-900 min-h-screen flex overflow-x-hidden">
-        <Sidebar />
-        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto">
-          {children}
-        </main>
+      <body className="bg-cream-100 dark:bg-[#0d0f12] text-stone-900 dark:text-stone-100 min-h-screen transition-colors duration-200">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

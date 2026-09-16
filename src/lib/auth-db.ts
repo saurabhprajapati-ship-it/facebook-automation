@@ -84,11 +84,11 @@ export async function getMasterUsers(): Promise<MasterUser[]> {
     } catch {}
   }
 
-  // Seed default admin Naveed if empty
+  // Seed default admin Saurabh if empty
   const defaultAdmin: MasterUser = {
-    id: 'usr_admin_naveed',
-    name: 'Naveed',
-    email: 'shahtube100@gmail.com',
+    id: 'usr_admin_saurabh',
+    name: 'Saurabh',
+    email: 'saurabhprajapatidev@gmail.com',
     passwordHash: hashPassword('admin123'),
     role: 'admin',
     createdAt: new Date().toISOString(),
@@ -96,6 +96,23 @@ export async function getMasterUsers(): Promise<MasterUser[]> {
 
   await saveMasterUsers([defaultAdmin]);
   return [defaultAdmin];
+}
+
+/**
+ * Extracts authenticated user from request cookie
+ */
+export async function getUserFromReq(req: Request): Promise<MasterUser | null> {
+  try {
+    const cookieHeader = req.headers.get('cookie') || '';
+    const match = cookieHeader.match(/postnova_session=([^;]+)/);
+    const sessionId = match ? match[1] : null;
+    if (!sessionId) return null;
+
+    const users = await getMasterUsers();
+    return users.find((u) => u.id === sessionId) || null;
+  } catch {
+    return null;
+  }
 }
 
 /**

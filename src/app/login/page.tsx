@@ -54,8 +54,46 @@ export default function LoginPage() {
   };
 
   const handleQuickAdminLogin = () => {
-    setEmail('shahtube100@gmail.com');
+    setEmail('saurabhprajapatidev@gmail.com');
     setPassword('admin123');
+  };
+
+  const handleGoogleLogin = async (customEmail?: string) => {
+    const targetEmail = customEmail || prompt('Enter your Google Account email:', 'saurabhprajapatidev@gmail.com');
+    if (!targetEmail) return;
+
+    setErrorMsg('');
+    setSuccessMsg('');
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: targetEmail,
+          name: targetEmail.split('@')[0],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Google Sign-In failed');
+      }
+
+      if (data.user) {
+        localStorage.setItem('postnova_user', JSON.stringify(data.user));
+      }
+
+      setSuccessMsg(`Signed in with Google as ${targetEmail}! Redirecting...`);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 800);
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -186,7 +224,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-brand-yellow hover:bg-brand-yellowHover text-amber-950 font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              className="w-full py-2.5 px-4 bg-brand-yellow hover:bg-brand-yellowHover text-amber-950 font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -202,6 +240,34 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Google Sign-in Divider */}
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-cream-200 dark:border-stone-800" />
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase">
+              <span className="bg-white dark:bg-stone-900 px-2 text-stone-400 font-bold tracking-wider">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          {/* Continue with Google Button */}
+          <button
+            type="button"
+            onClick={() => handleGoogleLogin()}
+            disabled={loading}
+            className="w-full py-2.5 px-4 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-100 font-bold text-xs rounded-xl border border-stone-200 dark:border-stone-700 shadow-xs transition flex items-center justify-center gap-2.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z" />
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.16 0 9.98 0 12s.45 3.84 1.25 5.42l4.03-3.15z" />
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
+            </svg>
+            <span>Sign in with Google</span>
+          </button>
+
           {/* Quick Admin fill */}
           {tab === 'login' && (
             <div className="mt-5 pt-4 border-t border-cream-200 dark:border-stone-800 text-center">
@@ -211,7 +277,7 @@ export default function LoginPage() {
                 className="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline flex items-center justify-center gap-1 mx-auto"
               >
                 <Sparkles className="w-3 h-3" />
-                <span>Quick-fill Admin Credentials (Naveed)</span>
+                <span>Quick-fill Admin Credentials (Saurabh)</span>
               </button>
             </div>
           )}
