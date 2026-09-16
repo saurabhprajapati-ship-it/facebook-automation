@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, Account } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq, Account } from '@/lib/db';
 import { fetchAccountsFromSystemUser, checkFacebookPage } from '@/lib/facebook';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  const db = getDb();
+export async function GET(req: Request) {
+  const db = await getDbFromReq(req);
   return NextResponse.json({ accounts: db.accounts }, {
     headers: {
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -15,6 +15,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { pageId, systemUserToken, pageAccessToken, name } = body;
 
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Page ID or System User Token is required.' }, { status: 400 });
     }
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     let tokenToUse = pageAccessToken;
     let finalPageId = pageId;
     let pageName = name || 'Facebook Page';
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
       db.accounts.push(newAccount);
     }
 
-    saveDb({ accounts: db.accounts });
+    await saveDbAsync({ accounts: db.accounts }, driveCreds);
     return NextResponse.json({ ok: true, account: newAccount });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to add account' }, { status: 500 });
@@ -89,12 +90,14 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const driveCreds = extractDriveFromReq(req);
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-  const db = getDb();
+  const db = await getDbFromReq(req);
   const updated = db.accounts.filter((a) => a.id !== id);
-  saveDb({ accounts: updated });
+  await saveDbAsync({ accounts: updated }, driveCreds);
   return NextResponse.json({ ok: true });
 }
+

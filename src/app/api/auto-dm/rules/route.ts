@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, AutoDmRule } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq, AutoDmRule } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const db = getDb();
+    const db = await getDbFromReq(req);
     return NextResponse.json({
       rules: db.autoDmRules || [],
       logs: (db.autoDmLogs || []).slice(-50).reverse(), // Last 50 logs, newest first
@@ -22,6 +22,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const {
       id,
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Direct Message (DM) text or link is required.' }, { status: 400 });
     }
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     const account = db.accounts.find((a) => a.id === targetAccountId || a.pageId === targetAccountId);
     const targetAccountName = account ? (account.username ? `@${account.username}` : account.name) : 'Instagram Account';
 
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
       rules.push(updatedRule);
     }
 
-    saveDb({ autoDmRules: rules });
+    await saveDbAsync({ autoDmRules: rules }, driveCreds);
     return NextResponse.json({ ok: true, rule: updatedRule });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to save rule' }, { status: 500 });
@@ -91,17 +92,18 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { id, enabled } = body;
     if (!id) return NextResponse.json({ error: 'Rule ID is required' }, { status: 400 });
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     const rules = db.autoDmRules || [];
     const index = rules.findIndex((r) => r.id === id);
     if (index === -1) return NextResponse.json({ error: 'Rule not found' }, { status: 404 });
 
     rules[index].enabled = Boolean(enabled);
-    saveDb({ autoDmRules: rules });
+    await saveDbAsync({ autoDmRules: rules }, driveCreds);
     return NextResponse.json({ ok: true, rule: rules[index] });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to update rule' }, { status: 500 });
@@ -109,12 +111,14 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const driveCreds = extractDriveFromReq(req);
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-  const db = getDb();
+  const db = await getDbFromReq(req);
   const rules = (db.autoDmRules || []).filter((r) => r.id !== id);
-  saveDb({ autoDmRules: rules });
+  await saveDbAsync({ autoDmRules: rules }, driveCreds);
   return NextResponse.json({ ok: true });
 }
+

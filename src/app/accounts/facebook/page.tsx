@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, Trash2, AlertTriangle, ShieldCheck, CheckCircle2, Instagram } from 'lucide-react';
 import { Account } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 
 export default function FacebookAccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -14,11 +15,12 @@ export default function FacebookAccountsPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const loadAccounts = () => {
-    fetch('/api/accounts')
+    fetchWithDrive('/api/accounts')
       .then((r) => r.json())
       .then((data) => {
         if (data.accounts) setAccounts(data.accounts);
-      });
+      })
+      .catch((e) => console.warn('Failed to load accounts:', e));
   };
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function FacebookAccountsPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/accounts', {
+      const res = await fetchWithDrive('/api/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -59,9 +61,10 @@ export default function FacebookAccountsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to disconnect this account?')) return;
-    await fetch(`/api/accounts?id=${id}`, { method: 'DELETE' });
+    await fetchWithDrive(`/api/accounts?id=${id}`, { method: 'DELETE' });
     loadAccounts();
   };
+
 
   const fbAccounts = accounts.filter((a) => a.platform === 'facebook');
 

@@ -17,6 +17,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { Account } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 
 export default function InstagramAccountsPage() {
   const [igAccounts, setIgAccounts] = useState<Account[]>([]);
@@ -35,7 +36,7 @@ export default function InstagramAccountsPage() {
   const loadAccounts = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/accounts/instagram');
+      const res = await fetchWithDrive('/api/accounts/instagram');
       const data = await res.json();
       if (data.accounts) {
         setIgAccounts(data.accounts);
@@ -44,7 +45,7 @@ export default function InstagramAccountsPage() {
         setDiscovered(data.discoveredFromFacebook);
       }
 
-      const fbRes = await fetch('/api/accounts');
+      const fbRes = await fetchWithDrive('/api/accounts');
       const fbData = await fbRes.json();
       if (fbData.accounts) {
         setFbAccounts(fbData.accounts.filter((a: Account) => a.platform === 'facebook'));
@@ -66,7 +67,7 @@ export default function InstagramAccountsPage() {
     setSuccessMsg('');
 
     try {
-      const res = await fetch('/api/accounts/instagram', {
+      const res = await fetchWithDrive('/api/accounts/instagram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ autoConnectFromPageId: pageId }),
@@ -93,7 +94,7 @@ export default function InstagramAccountsPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/accounts/instagram', {
+      const res = await fetchWithDrive('/api/accounts/instagram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -122,13 +123,14 @@ export default function InstagramAccountsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to disconnect this Instagram account?')) return;
     try {
-      await fetch(`/api/accounts/instagram?id=${id}`, { method: 'DELETE' });
+      await fetchWithDrive(`/api/accounts/instagram?id=${id}`, { method: 'DELETE' });
       setSuccessMsg('Instagram account disconnected.');
       loadAccounts();
     } catch (err: any) {
       setErrorMsg(err.message);
     }
   };
+
 
   return (
     <div className="space-y-6 max-w-5xl animate-fadeIn">

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import { Account, PostRecord } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 
 export default function HomePage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -25,8 +26,8 @@ export default function HomePage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/accounts').then((r) => r.json()),
-      fetch('/api/posts').then((r) => r.json()),
+      fetchWithDrive('/api/accounts').then((r) => r.json()),
+      fetchWithDrive('/api/posts').then((r) => r.json()),
     ])
       .then(([accData, postData]) => {
         if (accData.accounts) setAccounts(accData.accounts);

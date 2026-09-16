@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, syncDbFromDrive, syncDbToDrive, PostRecord, NotificationItem, AutoDmLog } from '@/lib/db';
+import { getDb, saveDb, saveDbAsync, extractDriveFromReq, syncDbFromDrive, syncDbToDrive, PostRecord, NotificationItem, AutoDmLog } from '@/lib/db';
 import { getDriveFileBuffer, saveDriveDatabase } from '@/lib/google-drive';
 import { publishBufferToFacebook } from '@/lib/facebook';
 import { generateCaptionForMedia } from '@/lib/gemini';
@@ -167,8 +167,9 @@ async function processAutoDmCron(db: ReturnType<typeof getDb>) {
 }
 
 async function handleCron(req: Request) {
+  const driveCreds = extractDriveFromReq(req);
   // Synchronize latest database state from Google Drive (ensures serverless cold starts have latest data)
-  await syncDbFromDrive();
+  await syncDbFromDrive(driveCreds);
   const db = getDb();
   const queue = db.scheduledQueue || [];
   const now = new Date();
@@ -184,11 +185,10 @@ async function handleCron(req: Request) {
   if (!dueItems.length) {
     // If auto-DMs were processed or logs were added, persist them
     if (autoDmResult.dmsSent > 0 || (db.autoDmLogs && db.autoDmLogs.length > 0)) {
-      saveDb({
+      await saveDbAsync({
         autoDmRules: db.autoDmRules,
         autoDmLogs: db.autoDmLogs,
-      });
-      await syncDbToDrive();
+      }, driveCreds);
     }
 
     return NextResponse.json({
@@ -453,16 +453,13 @@ async function handleCron(req: Request) {
     }
   }
 
-  saveDb({
+  await saveDbAsync({
     scheduledQueue: queue,
     posts: db.posts,
     notifications: db.notifications,
     autoDmRules: db.autoDmRules,
     autoDmLogs: db.autoDmLogs,
-  });
-
-  // Ensure full database sync to Google Drive completes before serverless terminates
-  await syncDbToDrive();
+  }, driveCreds);
 
   // Also preserve legacy scheduler_db.json if folder is set
   const driveSettings = db.driveSettings;

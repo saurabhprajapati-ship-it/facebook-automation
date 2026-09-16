@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, ScheduledPostItem, NotificationItem, PostRecord } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq, ScheduledPostItem, NotificationItem, PostRecord } from '@/lib/db';
 import { getDriveFileBuffer } from '@/lib/google-drive';
 import { publishBufferToFacebook } from '@/lib/facebook';
 import { generateCaptionForMedia } from '@/lib/gemini';
 import { processBrandedImageBuffer } from '@/lib/image-banner';
 import { uploadBufferToMetaCdn, publishInstagramFeedPost } from '@/lib/instagram';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const db = getDb();
+  const db = await getDbFromReq(req);
   let queue = db.scheduledQueue || [];
 
   const status = searchParams.get('status');
@@ -32,10 +34,11 @@ export async function GET(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { id, caption, scheduledAt, status } = body;
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     const queue = db.scheduledQueue || [];
     const item = queue.find((q) => q.id === id);
 
@@ -47,7 +50,7 @@ export async function PATCH(req: Request) {
     if (scheduledAt !== undefined) item.scheduledAt = scheduledAt;
     if (status !== undefined) item.status = status;
 
-    saveDb({ scheduledQueue: queue });
+    await saveDbAsync({ scheduledQueue: queue }, driveCreds);
     return NextResponse.json({ ok: true, item });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Update failed' }, { status: 500 });
@@ -56,17 +59,18 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const clearAll = searchParams.get('clearAll') === 'true';
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     let queue = db.scheduledQueue || [];
 
     if (clearAll) {
       // Keep posted records, clear scheduled/failed
       queue = queue.filter((q) => q.status === 'posted');
-      saveDb({ scheduledQueue: queue });
+      await saveDbAsync({ scheduledQueue: queue }, driveCreds);
       return NextResponse.json({ ok: true, message: 'Queue cleared' });
     }
 
@@ -75,7 +79,7 @@ export async function DELETE(req: Request) {
     }
 
     queue = queue.filter((q) => q.id !== id);
-    saveDb({ scheduledQueue: queue });
+    await saveDbAsync({ scheduledQueue: queue }, driveCreds);
     return NextResponse.json({ ok: true, message: 'Item deleted' });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Delete failed' }, { status: 500 });
@@ -85,10 +89,11 @@ export async function DELETE(req: Request) {
 // POST: "Post Now" for a specific queue item
 export async function POST(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { id } = body;
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     const queue = db.scheduledQueue || [];
     const item = queue.find((q) => q.id === id);
 
@@ -248,11 +253,11 @@ export async function POST(req: Request) {
       };
       db.notifications.unshift(notif);
 
-      saveDb({
+      await saveDbAsync({
         scheduledQueue: queue,
         posts: db.posts,
         notifications: db.notifications,
-      });
+      }, driveCreds);
 
       return NextResponse.json({
         ok: true,
@@ -344,11 +349,11 @@ export async function POST(req: Request) {
     };
     db.notifications.unshift(notif);
 
-    saveDb({
+    await saveDbAsync({
       scheduledQueue: queue,
       posts: db.posts,
       notifications: db.notifications,
-    });
+    }, driveCreds);
 
     return NextResponse.json({
       ok: true,

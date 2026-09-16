@@ -287,7 +287,17 @@ export function getDb(): DatabaseSchema {
   return ensureDb();
 }
 
-export function getActiveDriveCredentials(db?: DatabaseSchema): { credentialsJson?: string; folderId?: string } {
+export function getActiveDriveCredentials(
+  db?: DatabaseSchema,
+  explicitCreds?: { credentialsJson?: string; folderId?: string }
+): { credentialsJson?: string; folderId?: string } {
+  if (explicitCreds?.credentialsJson || explicitCreds?.folderId) {
+    return {
+      credentialsJson: explicitCreds.credentialsJson || db?.driveSettings?.serviceAccountJson || process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
+      folderId: explicitCreds.folderId || db?.driveSettings?.mainFolderId || process.env.GOOGLE_DRIVE_FOLDER_ID,
+    };
+  }
+
   const currentDb = db || ensureDb();
   const jsonFromDb = currentDb.driveSettings?.serviceAccountJson;
   const folderFromDb = currentDb.driveSettings?.mainFolderId;
@@ -298,11 +308,77 @@ export function getActiveDriveCredentials(db?: DatabaseSchema): { credentialsJso
   return { credentialsJson, folderId };
 }
 
+export function extractDriveFromReq(req: Request): { credentialsJson?: string; folderId?: string } {
+  try {
+    const headers = req.headers;
+    let folderId = headers.get('x-drive-folder-id') || undefined;
+    let rawCreds = headers.get('x-drive-creds') || undefined;
+
+    // Also check Cookie header if not found in custom headers!
+    const cookieHeader = headers.get('cookie') || '';
+    if (!folderId && cookieHeader) {
+      const matchFolder = cookieHeader.match(/(?:^|;\s*)drive_folder=([^;]+)/);
+      if (matchFolder) {
+        folderId = decodeURIComponent(matchFolder[1].trim());
+      }
+    }
+    if (!rawCreds && cookieHeader) {
+      const matchCreds = cookieHeader.match(/(?:^|;\s*)drive_creds=([^;]+)/);
+      if (matchCreds) {
+        rawCreds = decodeURIComponent(matchCreds[1].trim());
+      }
+    }
+
+    let credentialsJson: string | undefined;
+    if (rawCreds) {
+      try {
+        const decoded = Buffer.from(rawCreds, 'base64').toString('utf-8');
+        if (decoded.includes('private_key') || decoded.includes('client_email')) {
+          credentialsJson = decoded;
+        } else {
+          credentialsJson = decodeURIComponent(rawCreds);
+        }
+      } catch {
+        credentialsJson = decodeURIComponent(rawCreds);
+      }
+    }
+
+    let queryFolder: string | undefined;
+    try {
+      const url = new URL(req.url);
+      queryFolder = url.searchParams.get('folder') || url.searchParams.get('folderId') || undefined;
+    } catch {}
+
+    return {
+      folderId: folderId || queryFolder,
+      credentialsJson,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Returns latest database, automatically syncing from Google Drive
+ * if credentials or cookies are present on the request.
+ */
+export async function getDbFromReq(req?: Request): Promise<DatabaseSchema> {
+  if (!req) return ensureDb();
+  const driveCreds = extractDriveFromReq(req);
+  const active = getActiveDriveCredentials(undefined, driveCreds);
+  if (active.credentialsJson) {
+    return await syncDbFromDrive(active);
+  }
+  return ensureDb();
+}
+
 let isPushingToDrive = false;
 
-export async function syncDbFromDrive(): Promise<DatabaseSchema> {
+export async function syncDbFromDrive(
+  explicitCreds?: { credentialsJson?: string; folderId?: string }
+): Promise<DatabaseSchema> {
   const current = ensureDb();
-  const { credentialsJson, folderId } = getActiveDriveCredentials(current);
+  const { credentialsJson, folderId } = getActiveDriveCredentials(current, explicitCreds);
 
   if (!credentialsJson) {
     return current;
@@ -318,7 +394,8 @@ export async function syncDbFromDrive(): Promise<DatabaseSchema> {
         driveSettings: {
           ...current.driveSettings,
           ...(remoteDb.driveSettings || {}),
-          serviceAccountJson: current.driveSettings?.serviceAccountJson || remoteDb.driveSettings?.serviceAccountJson,
+          serviceAccountJson: credentialsJson || current.driveSettings?.serviceAccountJson || remoteDb.driveSettings?.serviceAccountJson,
+          mainFolderId: folderId || current.driveSettings?.mainFolderId || remoteDb.driveSettings?.mainFolderId,
         },
         branding: { ...DEFAULT_BRANDING, ...(remoteDb.branding || current.branding || {}) },
         autoDmRules: remoteDb.autoDmRules || current.autoDmRules || [],
@@ -336,13 +413,16 @@ export async function syncDbFromDrive(): Promise<DatabaseSchema> {
   return current;
 }
 
-export async function syncDbToDrive(data?: Partial<DatabaseSchema>): Promise<{ ok: boolean; error?: string }> {
+export async function syncDbToDrive(
+  data?: Partial<DatabaseSchema>,
+  explicitCreds?: { credentialsJson?: string; folderId?: string }
+): Promise<{ ok: boolean; error?: string }> {
   if (isPushingToDrive) return { ok: false, error: 'Sync already in progress' };
   isPushingToDrive = true;
   try {
     const current = ensureDb();
     const toSave = data ? { ...current, ...data } : current;
-    const { credentialsJson, folderId } = getActiveDriveCredentials(toSave);
+    const { credentialsJson, folderId } = getActiveDriveCredentials(toSave, explicitCreds);
 
     if (!credentialsJson) {
       return { ok: false, error: 'Google Drive credentials not configured' };
@@ -356,6 +436,23 @@ export async function syncDbToDrive(data?: Partial<DatabaseSchema>): Promise<{ o
   } finally {
     isPushingToDrive = false;
   }
+}
+
+export async function saveDbAsync(
+  data: Partial<DatabaseSchema>,
+  explicitCreds?: { credentialsJson?: string; folderId?: string }
+): Promise<DatabaseSchema> {
+  const current = ensureDb();
+  const updated: DatabaseSchema = {
+    ...current,
+    ...data,
+  };
+  fs.writeFileSync(DB_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+
+  // Await Google Drive push so Vercel Serverless doesn't freeze prematurely!
+  await syncDbToDrive(updated, explicitCreds);
+
+  return updated;
 }
 
 export function saveDb(data: Partial<DatabaseSchema>): DatabaseSchema {

@@ -1,7 +1,30 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HardDrive, CheckCircle2, AlertCircle, RefreshCw, Folder, ExternalLink, Key, ShieldCheck, HelpCircle, Database, CloudUpload, CloudDownload, Download } from 'lucide-react';
+import {
+  HardDrive,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Folder,
+  ExternalLink,
+  Key,
+  ShieldCheck,
+  HelpCircle,
+  Database,
+  CloudUpload,
+  CloudDownload,
+  Download,
+  Clock,
+  Copy,
+  Trash2
+} from 'lucide-react';
+import {
+  getStoredDriveConfig,
+  saveStoredDriveConfig,
+  clearStoredDriveConfig,
+  fetchWithDrive
+} from '@/lib/client-drive';
 
 export default function DrivePage() {
   const [loading, setLoading] = useState(true);
@@ -15,19 +38,21 @@ export default function DrivePage() {
   const [subfolders, setSubfolders] = useState<{ id: string; name: string }[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [copiedCron, setCopiedCron] = useState(false);
 
   // Form inputs
   const [jsonInput, setJsonInput] = useState('');
   const [folderLinkInput, setFolderLinkInput] = useState('');
 
   useEffect(() => {
-    fetch('/api/drive/connect')
+    const { folderId } = getStoredDriveConfig();
+    fetchWithDrive('/api/drive/connect')
       .then((res) => res.json())
       .then((data) => {
         setStatus(data.status || 'disconnected');
         setClientEmail(data.clientEmail || '');
         setMainFolderName(data.mainFolderName || '');
-        setMainFolderId(data.mainFolderId || '');
+        setMainFolderId(data.mainFolderId || folderId || '');
         if (data.folderMappings) {
           setSubfolders(data.folderMappings.map((m: any) => ({ id: m.folderId, name: m.folderName })));
         }
@@ -54,7 +79,7 @@ export default function DrivePage() {
     setSuccessMsg('');
 
     try {
-      const res = await fetch('/api/drive/connect', {
+      const res = await fetchWithDrive('/api/drive/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -68,12 +93,16 @@ export default function DrivePage() {
         throw new Error(data.error || 'Connection failed');
       }
 
+      const activeFolderId = data.mainFolderId || folderLinkInput.trim();
       setStatus('connected');
       setClientEmail(data.clientEmail || '');
       setMainFolderName(data.mainFolderName || '');
-      setMainFolderId(data.mainFolderId || '');
+      setMainFolderId(activeFolderId);
       setSubfolders(data.subfolders || []);
       setSuccessMsg('Google Drive connected successfully! 5 TB Storage ready.');
+
+      // Save to client localStorage & cookies for permanent refresh persistence
+      saveStoredDriveConfig(activeFolderId, jsonInput.trim() || undefined);
     } catch (err: any) {
       setStatus('error');
       setErrorMsg(err.message);
@@ -82,12 +111,28 @@ export default function DrivePage() {
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!confirm('Are you sure you want to disconnect Google Drive?')) return;
+    try {
+      await fetch('/api/drive/connect', { method: 'DELETE' });
+      clearStoredDriveConfig();
+      setStatus('disconnected');
+      setClientEmail('');
+      setMainFolderName('');
+      setMainFolderId('');
+      setSubfolders([]);
+      setSuccessMsg('Google Drive disconnected.');
+    } catch (e: any) {
+      setErrorMsg(e.message);
+    }
+  };
+
   const handlePushDb = async () => {
     setSyncingDb(true);
     setSyncStatusMsg('');
     setErrorMsg('');
     try {
-      const res = await fetch('/api/db/sync', { method: 'POST' });
+      const res = await fetchWithDrive('/api/db/sync', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Push failed');
       setSyncStatusMsg(`Database backed up to Google Drive (postnova_db.json) at ${new Date().toLocaleTimeString()}!`);
@@ -103,7 +148,7 @@ export default function DrivePage() {
     setSyncStatusMsg('');
     setErrorMsg('');
     try {
-      const res = await fetch('/api/db/sync', { method: 'GET' });
+      const res = await fetchWithDrive('/api/db/sync', { method: 'GET' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Pull failed');
       setSyncStatusMsg(`Successfully synced state from Google Drive (${data.stats?.accounts || 0} accounts, ${data.stats?.scheduledQueue || 0} posts queued).`);
@@ -113,6 +158,7 @@ export default function DrivePage() {
       setSyncingDb(false);
     }
   };
+
 
   const handleDownloadTemplateDb = async () => {
     try {
@@ -201,9 +247,20 @@ export default function DrivePage() {
         </div>
 
         {status === 'connected' && (
-          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-full text-xs font-bold shadow-2xs">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Connected & Live</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-full text-xs font-bold shadow-2xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>Connected &amp; Live</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              className="flex items-center gap-1.5 bg-stone-100 hover:bg-red-50 hover:text-red-700 text-stone-600 border border-stone-200 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer"
+              title="Disconnect Google Drive"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Disconnect</span>
+            </button>
           </div>
         )}
       </div>
@@ -374,6 +431,50 @@ export default function DrivePage() {
             <span>
               <strong>Dual-Mode Active:</strong> On your PC, operations save locally instantly. In Vercel cloud, automation reads &amp; writes to this Drive database 24/7 without needing your PC.
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* 24/7 Automation Cron Job Card */}
+      {status === 'connected' && mainFolderId && (
+        <div className="bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/40 rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-3 pb-3 border-b border-emerald-100">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-xs">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-stone-900 flex items-center gap-2">
+                Your Personal 24/7 Automation Cron URL
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  100% Free 24/7
+                </span>
+              </h3>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Put this URL into <strong>Cron-Job.org</strong> (every 1 minute) to post automatically from your Google Drive without keeping your PC on!
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={`${typeof window !== 'undefined' ? window.location.origin : 'https://facebook-automation-blond.vercel.app'}/api/cron?folder=${mainFolderId}`}
+              className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-mono text-stone-800 select-all"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const cronUrl = `${window.location.origin}/api/cron?folder=${mainFolderId}`;
+                navigator.clipboard.writeText(cronUrl);
+                setCopiedCron(true);
+                setTimeout(() => setCopiedCron(false), 2500);
+              }}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Copy className="w-4 h-4" />
+              {copiedCron ? 'Copied to Clipboard!' : 'Copy Cron URL'}
+            </button>
           </div>
         </div>
       )}

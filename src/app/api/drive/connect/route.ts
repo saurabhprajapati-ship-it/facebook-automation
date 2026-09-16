@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, syncDbFromDrive, extractDriveFromReq } from '@/lib/db';
 import { testDriveConnection, listDriveSubfolders, extractFolderId } from '@/lib/google-drive';
 
-export async function GET() {
-  const db = getDb();
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
+  const db = await getDbFromReq(req);
   const settings = db.driveSettings || { status: 'disconnected' };
   return NextResponse.json({
     status: settings.status || 'disconnected',
@@ -14,6 +16,10 @@ export async function GET() {
     folderMappings: settings.folderMappings || [],
     hasKey: Boolean(settings.serviceAccountJson),
     lastError: settings.lastError,
+  }, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    },
   });
 }
 
@@ -22,8 +28,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { serviceAccountJson, mainFolderInput } = body;
 
-    const db = getDb();
-    const currentJson = serviceAccountJson || db.driveSettings?.serviceAccountJson;
+    const driveCreds = extractDriveFromReq(req);
+    const db = await getDbFromReq(req);
+    const currentJson = serviceAccountJson || driveCreds.credentialsJson || db.driveSettings?.serviceAccountJson;
 
     if (!currentJson) {
       return NextResponse.json(
@@ -34,7 +41,7 @@ export async function POST(req: Request) {
 
     const testRes = await testDriveConnection(currentJson, mainFolderInput);
     if (!testRes.ok) {
-      saveDb({
+      await saveDbAsync({
         driveSettings: {
           ...(db.driveSettings || {}),
           status: 'error',
@@ -73,15 +80,44 @@ export async function POST(req: Request) {
       lastError: undefined,
     };
 
-    saveDb({ driveSettings: updatedSettings });
+    // First attempt to pull any existing database in this Drive folder
+    try {
+      await syncDbFromDrive({ credentialsJson: currentJson, folderId });
+    } catch (e) {
+      console.warn('Initial sync from drive failed during connect:', e);
+    }
 
-    return NextResponse.json({
+    // Save and push back to Drive
+    await saveDbAsync({ driveSettings: updatedSettings }, { credentialsJson: currentJson, folderId });
+
+    const response = NextResponse.json({
       ok: true,
       clientEmail: testRes.clientEmail,
       mainFolderName: updatedSettings.mainFolderName,
       mainFolderId: folderId,
       subfolders,
     });
+
+    // Set persistent session cookies for the browser
+    if (folderId) {
+      response.cookies.set('drive_folder', folderId, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: 'lax',
+      });
+    }
+    if (currentJson) {
+      try {
+        const b64 = Buffer.from(currentJson).toString('base64');
+        response.cookies.set('drive_creds', b64, {
+          path: '/',
+          maxAge: 60 * 60 * 24 * 365,
+          sameSite: 'lax',
+        });
+      } catch {}
+    }
+
+    return response;
   } catch (err: any) {
     return NextResponse.json(
       { error: err.message || 'Internal server error' },
@@ -89,3 +125,23 @@ export async function POST(req: Request) {
     );
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const driveCreds = extractDriveFromReq(req);
+    await saveDbAsync({
+      driveSettings: {
+        status: 'disconnected',
+        folderMappings: [],
+      }
+    }, driveCreds);
+
+    const res = NextResponse.json({ ok: true, message: 'Disconnected' });
+    res.cookies.set('drive_folder', '', { path: '/', maxAge: 0, sameSite: 'lax' });
+    res.cookies.set('drive_creds', '', { path: '/', maxAge: 0, sameSite: 'lax' });
+    return res;
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+

@@ -1,20 +1,27 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, PostRecord } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq, PostRecord } from '@/lib/db';
 import { publishToFacebook, publishBufferToFacebook } from '@/lib/facebook';
 import { publishInstagramFeedPost } from '@/lib/instagram';
 import { processBrandedImageUrl } from '@/lib/image-banner';
 
-export async function GET() {
-  const db = getDb();
-  return NextResponse.json({ posts: db.posts });
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
+  const db = await getDbFromReq(req);
+  return NextResponse.json({ posts: db.posts }, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    },
+  });
 }
 
 export async function POST(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { accountId, message, link, imageUrl, applyBranding = true } = body;
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     const finalMessage = [message, link].filter(Boolean).join('\n\n');
 
     if (accountId === 'both') {
@@ -113,7 +120,7 @@ export async function POST(req: Request) {
         }
       }
 
-      saveDb({ posts: db.posts });
+      await saveDbAsync({ posts: db.posts }, driveCreds);
       return NextResponse.json({
         ok: true,
         postId: publishedIds.join(', '),
@@ -205,7 +212,7 @@ export async function POST(req: Request) {
     };
     db.posts.unshift(newPost);
     account.lastPostedAt = new Date().toISOString();
-    saveDb({ posts: db.posts, accounts: db.accounts });
+    await saveDbAsync({ posts: db.posts, accounts: db.accounts }, driveCreds);
 
     return NextResponse.json({ ok: true, postId, platform: account.platform });
   } catch (err: any) {
@@ -213,8 +220,9 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE() {
-  saveDb({ posts: [] });
+export async function DELETE(req: Request) {
+  const driveCreds = extractDriveFromReq(req);
+  await saveDbAsync({ posts: [] }, driveCreds);
   return NextResponse.json({ ok: true });
 }
 

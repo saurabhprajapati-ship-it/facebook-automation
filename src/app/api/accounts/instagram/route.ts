@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, Account } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq, Account } from '@/lib/db';
 import {
   getConnectedInstagramAccount,
   verifyInstagramAccount,
@@ -8,9 +8,9 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const db = getDb();
+    const db = await getDbFromReq(req);
     const instagramAccounts = db.accounts.filter((a) => a.platform === 'instagram');
     const facebookAccounts = db.accounts.filter((a) => a.platform === 'facebook');
 
@@ -40,9 +40,10 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { autoConnectFromPageId, igUserId, pageAccessToken, name } = body;
-    const db = getDb();
+    const db = await getDbFromReq(req);
 
     let accountToAdd: Account | null = null;
 
@@ -125,7 +126,7 @@ export async function POST(req: Request) {
       db.accounts.push(accountToAdd);
     }
 
-    saveDb({ accounts: db.accounts });
+    await saveDbAsync({ accounts: db.accounts }, driveCreds);
     return NextResponse.json({ ok: true, account: accountToAdd });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to connect Instagram account' }, { status: 500 });
@@ -133,12 +134,14 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const driveCreds = extractDriveFromReq(req);
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-  const db = getDb();
+  const db = await getDbFromReq(req);
   const updated = db.accounts.filter((a) => a.id !== id);
-  saveDb({ accounts: updated });
+  await saveDbAsync({ accounts: updated }, driveCreds);
   return NextResponse.json({ ok: true });
 }
+

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getDb, syncDbFromDrive, syncDbToDrive, getActiveDriveCredentials } from '@/lib/db';
+import { getDb, syncDbFromDrive, syncDbToDrive, getActiveDriveCredentials, extractDriveFromReq } from '@/lib/db';
 
-export async function GET() {
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: Request) {
   try {
-    const { credentialsJson, folderId } = getActiveDriveCredentials();
+    const driveCreds = extractDriveFromReq(req);
+    const { credentialsJson, folderId } = getActiveDriveCredentials(undefined, driveCreds);
     const hasCredentials = Boolean(credentialsJson);
 
     if (!hasCredentials) {
@@ -22,7 +25,7 @@ export async function GET() {
     }
 
     // Pull latest database from Google Drive
-    const syncedDb = await syncDbFromDrive();
+    const syncedDb = await syncDbFromDrive({ credentialsJson, folderId });
 
     return NextResponse.json({
       ok: true,
@@ -44,9 +47,10 @@ export async function GET() {
   }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const { credentialsJson, folderId } = getActiveDriveCredentials();
+    const driveCreds = extractDriveFromReq(req);
+    const { credentialsJson, folderId } = getActiveDriveCredentials(undefined, driveCreds);
     if (!credentialsJson) {
       return NextResponse.json(
         { ok: false, error: 'Cannot push: Google Drive credentials not configured' },
@@ -54,7 +58,7 @@ export async function POST() {
       );
     }
 
-    const pushRes = await syncDbToDrive();
+    const pushRes = await syncDbToDrive(undefined, { credentialsJson, folderId });
     if (!pushRes.ok) {
       return NextResponse.json(
         { ok: false, error: pushRes.error || 'Push to Google Drive failed' },
@@ -81,3 +85,4 @@ export async function POST() {
     );
   }
 }
+

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, ScheduledPostItem } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq, ScheduledPostItem } from '@/lib/db';
 import { saveDriveDatabase } from '@/lib/google-drive';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
     const { slots, driveFolderId, replaceExisting = false } = body;
 
@@ -14,7 +17,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const db = getDb();
+    const db = await getDbFromReq(req);
     let currentQueue = db.scheduledQueue || [];
 
     if (replaceExisting) {
@@ -25,8 +28,14 @@ export async function POST(req: Request) {
     // Merge new slots into queue
     const updatedQueue: ScheduledPostItem[] = [...currentQueue, ...slots];
 
-    // Save to local DB
-    saveDb({
+    const targetFolder = driveFolderId || driveCreds.folderId || db.driveSettings?.mainFolderId;
+    const credsToUse = {
+      credentialsJson: driveCreds.credentialsJson || db.driveSettings?.serviceAccountJson,
+      folderId: targetFolder,
+    };
+
+    // Save and await cloud sync
+    await saveDbAsync({
       scheduledQueue: updatedQueue,
       notifications: [
         {
@@ -38,16 +47,13 @@ export async function POST(req: Request) {
         },
         ...(db.notifications || []),
       ],
-    });
+    }, credsToUse);
 
     // Also sync to Google Drive scheduler_db.json
     let driveSynced = false;
-    const settings = db.driveSettings;
-    const targetFolder = driveFolderId || settings?.mainFolderId;
-
-    if (settings?.serviceAccountJson && targetFolder) {
+    if (credsToUse.credentialsJson && credsToUse.folderId) {
       try {
-        await saveDriveDatabase(settings.serviceAccountJson, targetFolder, {
+        await saveDriveDatabase(credsToUse.credentialsJson, credsToUse.folderId, {
           updatedAt: new Date().toISOString(),
           totalSlots: updatedQueue.length,
           queue: updatedQueue,
@@ -71,3 +77,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

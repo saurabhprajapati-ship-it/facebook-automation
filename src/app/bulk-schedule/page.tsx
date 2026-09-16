@@ -22,6 +22,7 @@ import {
   Upload
 } from 'lucide-react';
 import Link from 'next/link';
+import { fetchWithDrive } from '@/lib/client-drive';
 
 interface Account {
   id: string;
@@ -104,7 +105,7 @@ export default function BulkSchedulePage() {
   // Initial Load
   useEffect(() => {
     // Load accounts
-    fetch('/api/accounts')
+    fetchWithDrive('/api/accounts')
       .then((res) => res.json())
       .then((data) => {
         const accs = data.accounts || [];
@@ -114,7 +115,7 @@ export default function BulkSchedulePage() {
       .catch(() => {});
 
     // Load Drive status
-    fetch('/api/drive/connect')
+    fetchWithDrive('/api/drive/connect')
       .then((res) => res.json())
       .then((data) => {
         if (data.status === 'connected') {
@@ -148,7 +149,7 @@ export default function BulkSchedulePage() {
   const loadQueue = async () => {
     setLoadingQueue(true);
     try {
-      const res = await fetch('/api/bulk/queue');
+      const res = await fetchWithDrive('/api/bulk/queue');
       const data = await res.json();
       setQueueItems(data.items || []);
     } catch (err) {
@@ -157,6 +158,7 @@ export default function BulkSchedulePage() {
       setLoadingQueue(false);
     }
   };
+
 
   const handleSyncPreview = async () => {
     setErrorMsg('');
@@ -172,7 +174,7 @@ export default function BulkSchedulePage() {
         throw new Error('Please connect and select a Facebook Page');
       }
 
-      const res = await fetch('/api/bulk/sync', {
+      const res = await fetchWithDrive('/api/bulk/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -221,7 +223,7 @@ export default function BulkSchedulePage() {
 
     try {
       const folderToUse = selectedFolderId === 'custom' ? customFolderInput : (selectedFolderId || customFolderInput);
-      const res = await fetch('/api/bulk/save-schedule', {
+      const res = await fetchWithDrive('/api/bulk/save-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -253,7 +255,7 @@ export default function BulkSchedulePage() {
     setSuccessMsg('');
 
     try {
-      const res = await fetch('/api/bulk/queue', {
+      const res = await fetchWithDrive('/api/bulk/queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: slotId }),
@@ -282,7 +284,7 @@ export default function BulkSchedulePage() {
   const handleDeleteQueueItem = async (slotId: string) => {
     if (!confirm('Are you sure you want to delete this scheduled post?')) return;
     try {
-      await fetch(`/api/bulk/queue?id=${encodeURIComponent(slotId)}`, { method: 'DELETE' });
+      await fetchWithDrive(`/api/bulk/queue?id=${encodeURIComponent(slotId)}`, { method: 'DELETE' });
       loadQueue();
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -292,12 +294,13 @@ export default function BulkSchedulePage() {
   const handleClearQueue = async () => {
     if (!confirm('Delete all pending scheduled posts in queue? (Already live posts will be kept)')) return;
     try {
-      await fetch('/api/bulk/queue?clearAll=true', { method: 'DELETE' });
+      await fetchWithDrive('/api/bulk/queue?clearAll=true', { method: 'DELETE' });
       loadQueue();
     } catch (err: any) {
       setErrorMsg(err.message);
     }
   };
+
 
   const updatePreviewCaption = (index: number, newCaption: string) => {
     setPreviewSlots((prev) => {

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  const db = getDb();
+export async function GET(req: Request) {
+  const db = await getDbFromReq(req);
   return NextResponse.json({
     branding: db.branding,
     accounts: db.accounts,
@@ -17,8 +17,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
-    const db = getDb();
+    const db = await getDbFromReq(req);
 
     const { accountName, accountId, ...brandingFields } = body;
 
@@ -41,10 +42,10 @@ export async function POST(req: Request) {
       ...brandingFields,
     };
 
-    saveDb({
+    await saveDbAsync({
       branding: updated,
       accounts: db.accounts,
-    });
+    }, driveCreds);
 
     return NextResponse.json({
       ok: true,
@@ -59,3 +60,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
