@@ -1,0 +1,10 @@
+[
+  {
+    "id": "usr_admin_saurabh",
+    "name": "Saurabh",
+    "email": "saurabhprajapatidev@gmail.com",
+    "passwordHash": "811306030a6df4f890085841475b4f908c035b69d39b08f4881846ce5ebb07ad",
+    "role": "admin",
+    "createdAt": "2026-09-16T13:58:34.791Z"
+  }
+]
