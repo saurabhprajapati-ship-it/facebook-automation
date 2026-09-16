@@ -53,46 +53,95 @@ export default function LoginPage() {
     }
   };
 
+  const GOOGLE_CLIENT_ID =
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+    '902847109069-lm4e12l234pq8u61u1at1okb9quc863n.apps.googleusercontent.com';
+
+  React.useEffect(() => {
+    // Load official Google Identity Services SDK
+    if (document.getElementById('google-gsi-client')) return;
+    const script = document.createElement('script');
+    script.id = 'google-gsi-client';
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+  }, []);
+
   const handleQuickAdminLogin = () => {
     setEmail('saurabhprajapatidev@gmail.com');
     setPassword('admin123');
   };
 
-  const handleGoogleLogin = async (customEmail?: string) => {
-    const targetEmail = customEmail || prompt('Enter your Google Account email:', 'saurabhprajapatidev@gmail.com');
-    if (!targetEmail) return;
-
+  const handleGoogleLogin = () => {
     setErrorMsg('');
     setSuccessMsg('');
-    setLoading(true);
+
+    if (typeof window === 'undefined' || !(window as any).google?.accounts?.oauth2) {
+      setErrorMsg('Google Sign-In is initializing. Please click again in 2 seconds.');
+      return;
+    }
 
     try {
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: targetEmail,
-          name: targetEmail.split('@')[0],
-        }),
+      // Official Google OAuth 2.0 Token Client with prompt='select_account'
+      // This displays the exact official Google "Choose an account" screen
+      const client = (window as any).google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'email profile openid',
+        prompt: 'select_account',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.error) {
+            setErrorMsg('Google login failed: ' + tokenResponse.error);
+            return;
+          }
+
+          setLoading(true);
+          try {
+            // Fetch verified user profile directly from Google
+            const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+            });
+            const profile = await userInfoRes.json();
+
+            if (!profile?.email) {
+              throw new Error('Could not retrieve email from Google');
+            }
+
+            // Authenticate and establish session on backend
+            const res = await fetch('/api/auth/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: profile.email,
+                name: profile.name || profile.given_name || profile.email.split('@')[0],
+                avatarUrl: profile.picture,
+              }),
+            });
+
+            const data = await res.json();
+            if (!res.ok || data.error) {
+              throw new Error(data.error || 'Authentication failed');
+            }
+
+            if (data.user) {
+              localStorage.setItem('postnova_user', JSON.stringify(data.user));
+            }
+
+            setSuccessMsg(`Signed in with Google as ${profile.name || profile.email}! Redirecting...`);
+            setTimeout(() => {
+              window.location.href = '/';
+            }, 600);
+          } catch (err: any) {
+            setErrorMsg(err.message || 'Google Authentication failed');
+          } finally {
+            setLoading(false);
+          }
+        },
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Google Sign-In failed');
-      }
-
-      if (data.user) {
-        localStorage.setItem('postnova_user', JSON.stringify(data.user));
-      }
-
-      setSuccessMsg(`Signed in with Google as ${targetEmail}! Redirecting...`);
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 800);
+      client.requestAccessToken();
     } catch (err: any) {
-      setErrorMsg(err.message);
-    } finally {
-      setLoading(false);
+      setErrorMsg('Could not start Google Sign-In: ' + err.message);
     }
   };
 
