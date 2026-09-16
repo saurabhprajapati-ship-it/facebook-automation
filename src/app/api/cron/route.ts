@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, saveDbAsync, extractDriveFromReq, syncDbFromDrive, syncDbToDrive, PostRecord, NotificationItem, AutoDmLog } from '@/lib/db';
+import { getDb, saveDb, saveDbAsync, extractDriveFromReq, getActiveDriveCredentials, syncDbFromDrive, syncDbToDrive, PostRecord, NotificationItem, AutoDmLog } from '@/lib/db';
 import { getDriveFileBuffer, saveDriveDatabase } from '@/lib/google-drive';
 import { publishBufferToFacebook } from '@/lib/facebook';
 import { generateCaptionForMedia } from '@/lib/gemini';
@@ -233,13 +233,13 @@ async function handleCron(req: Request) {
       }
 
       // Get buffer from Drive
-      const driveSettings = db.driveSettings;
-      if (!driveSettings?.serviceAccountJson || !item.fileId) {
+      const { credentialsJson: activeDriveKey } = getActiveDriveCredentials(db, driveCreds);
+      if (!activeDriveKey || !item.fileId) {
         throw new Error('Google Drive credentials or File ID missing');
       }
 
       const { buffer, mimeType, name } = await getDriveFileBuffer(
-        driveSettings.serviceAccountJson,
+        activeDriveKey,
         item.fileId
       );
 
@@ -462,10 +462,10 @@ async function handleCron(req: Request) {
   }, driveCreds);
 
   // Also preserve legacy scheduler_db.json if folder is set
-  const driveSettings = db.driveSettings;
-  if (driveSettings?.serviceAccountJson && driveSettings?.mainFolderId) {
+  const { credentialsJson: legacyKey, folderId: legacyFolder } = getActiveDriveCredentials(db, driveCreds);
+  if (legacyKey && legacyFolder) {
     try {
-      await saveDriveDatabase(driveSettings.serviceAccountJson, driveSettings.mainFolderId, {
+      await saveDriveDatabase(legacyKey, legacyFolder, {
         updatedAt: new Date().toISOString(),
         totalSlots: queue.length,
         queue,
