@@ -1,18 +1,41 @@
 import { NextResponse } from 'next/server';
 import { getDbFromReq, saveDbAsync, extractDriveFromReq, AutoDmRule } from '@/lib/db';
+import { getUserFromReq } from '@/lib/auth-db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
+    const user = await getUserFromReq(req);
     const db = await getDbFromReq(req);
+
+    const isAdmin =
+      user?.role === 'admin' ||
+      user?.email === 'saurabhprajapatidev@gmail.com' ||
+      user?.id === 'usr_admin_saurabh';
+
+    let rules = db.autoDmRules || [];
+    let logs = db.autoDmLogs || [];
+
+    if (user) {
+      if (isAdmin) {
+        rules = rules.filter((r: any) => !r.userId || r.userId === user.id || r.userId === 'usr_admin_saurabh');
+      } else {
+        rules = rules.filter((r: any) => r.userId === user.id);
+        logs = logs.filter((l: any) => rules.some((r) => r.id === l.ruleId));
+      }
+    } else {
+      rules = [];
+      logs = [];
+    }
+
     return NextResponse.json({
-      rules: db.autoDmRules || [],
-      logs: (db.autoDmLogs || []).slice(-50).reverse(), // Last 50 logs, newest first
+      rules,
+      logs: logs.slice(-50).reverse(), // Last 50 logs, newest first
       stats: {
-        totalRules: (db.autoDmRules || []).length,
-        activeRules: (db.autoDmRules || []).filter((r) => r.enabled).length,
-        totalDmsSent: (db.autoDmRules || []).reduce((acc, r) => acc + (r.stats?.totalSent || 0), 0),
+        totalRules: rules.length,
+        activeRules: rules.filter((r) => r.enabled).length,
+        totalDmsSent: rules.reduce((acc, r) => acc + (r.stats?.totalSent || 0), 0),
       },
     });
   } catch (err: any) {
@@ -59,8 +82,12 @@ export async function POST(req: Request) {
     const ruleId = id || 'rule_' + Date.now();
     const existingIndex = rules.findIndex((r) => r.id === ruleId);
 
+    const user = await getUserFromReq(req);
+    const activeUserId = user ? user.id : 'usr_admin_saurabh';
+
     const updatedRule: AutoDmRule = {
       id: ruleId,
+      userId: activeUserId,
       name: name || (keywords.length ? `Auto-DM on "${keywords.join(', ')}"` : 'Auto-DM for all comments'),
       enabled: enabled !== false,
       platform: platform,

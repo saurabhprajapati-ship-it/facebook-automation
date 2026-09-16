@@ -1,15 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDbFromReq } from '@/lib/db';
 import { listDriveSubfolders, extractFolderId } from '@/lib/google-drive';
+import { getUserFromReq } from '@/lib/auth-db';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const db = getDb();
-  const settings = db.driveSettings;
+  const user = await getUserFromReq(req);
+  const db = await getDbFromReq(req);
+
+  const isAdmin =
+    user?.role === 'admin' ||
+    user?.email === 'saurabhprajapatidev@gmail.com' ||
+    user?.id === 'usr_admin_saurabh';
+
+  const userDriveMap = (db as any).userDriveSettings || {};
+  let settings = db.driveSettings;
+  if (user && !isAdmin) {
+    settings = userDriveMap[user.id] || undefined;
+  } else if (!user) {
+    settings = undefined;
+  }
 
   if (!settings?.serviceAccountJson) {
     return NextResponse.json(
-      { error: 'Google Drive is not connected yet. Please connect Service Account first.' },
+      { error: 'Google Drive is not connected yet. Please connect your Google Drive first.', subfolders: [] },
       { status: 400 }
     );
   }

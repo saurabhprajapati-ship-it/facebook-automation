@@ -141,6 +141,7 @@ export interface ScheduledPostItem {
 
 export interface AutoDmRule {
   id: string;
+  userId?: string;
   name: string;
   enabled: boolean;
   platform: 'instagram' | 'facebook';
@@ -162,6 +163,7 @@ export interface AutoDmRule {
 
 export interface AutoDmLog {
   id: string;
+  userId?: string;
   ruleId: string;
   ruleName?: string;
   platform: 'instagram' | 'facebook';
@@ -197,7 +199,7 @@ const isVercel = Boolean(process.env.VERCEL);
 const DB_DIR = isVercel ? path.join('/tmp', 'data') : path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
 
-const DEFAULT_BRANDING: BrandingSettings = {
+export const DEFAULT_BRANDING: BrandingSettings = {
   enabledOnAuto: true,
   offerOnManual: true,
   showAccountName: true,

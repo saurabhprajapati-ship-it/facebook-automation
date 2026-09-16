@@ -1,12 +1,28 @@
 import { NextResponse } from 'next/server';
 import { getDbFromReq, saveDbAsync, syncDbFromDrive, extractDriveFromReq } from '@/lib/db';
 import { testDriveConnection, listDriveSubfolders, extractFolderId } from '@/lib/google-drive';
+import { getUserFromReq } from '@/lib/auth-db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
+  const user = await getUserFromReq(req);
   const db = await getDbFromReq(req);
-  const settings = db.driveSettings || { status: 'disconnected' };
+
+  const isAdmin =
+    user?.role === 'admin' ||
+    user?.email === 'saurabhprajapatidev@gmail.com' ||
+    user?.id === 'usr_admin_saurabh';
+
+  const userDriveMap = (db as any).userDriveSettings || {};
+  let settings = db.driveSettings || { status: 'disconnected' };
+
+  if (user && !isAdmin) {
+    settings = userDriveMap[user.id] || { status: 'disconnected' };
+  } else if (!user) {
+    settings = { status: 'disconnected' };
+  }
+
   return NextResponse.json({
     status: settings.status || 'disconnected',
     clientEmail: settings.clientEmail || '',
@@ -87,8 +103,19 @@ export async function POST(req: Request) {
       console.warn('Initial sync from drive failed during connect:', e);
     }
 
-    // Save and push back to Drive
-    await saveDbAsync({ driveSettings: updatedSettings }, { credentialsJson: currentJson, folderId });
+    const user = await getUserFromReq(req);
+    const isAdmin =
+      user?.role === 'admin' ||
+      user?.email === 'saurabhprajapatidev@gmail.com' ||
+      user?.id === 'usr_admin_saurabh';
+
+    const userDriveMap = (db as any).userDriveSettings || {};
+    if (user && !isAdmin) {
+      userDriveMap[user.id] = updatedSettings;
+      await saveDbAsync({ userDriveSettings: userDriveMap } as any, { credentialsJson: currentJson, folderId });
+    } else {
+      await saveDbAsync({ driveSettings: updatedSettings }, { credentialsJson: currentJson, folderId });
+    }
 
     const response = NextResponse.json({
       ok: true,
@@ -128,13 +155,27 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const user = await getUserFromReq(req);
+    const db = await getDbFromReq(req);
     const driveCreds = extractDriveFromReq(req);
-    await saveDbAsync({
-      driveSettings: {
-        status: 'disconnected',
-        folderMappings: [],
-      }
-    }, driveCreds);
+
+    const isAdmin =
+      user?.role === 'admin' ||
+      user?.email === 'saurabhprajapatidev@gmail.com' ||
+      user?.id === 'usr_admin_saurabh';
+
+    const userDriveMap = (db as any).userDriveSettings || {};
+    if (user && !isAdmin) {
+      delete userDriveMap[user.id];
+      await saveDbAsync({ userDriveSettings: userDriveMap } as any, driveCreds);
+    } else {
+      await saveDbAsync({
+        driveSettings: {
+          status: 'disconnected',
+          folderMappings: [],
+        }
+      }, driveCreds);
+    }
 
     const res = NextResponse.json({ ok: true, message: 'Disconnected' });
     res.cookies.set('drive_folder', '', { path: '/', maxAge: 0, sameSite: 'lax' });

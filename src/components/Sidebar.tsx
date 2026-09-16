@@ -20,7 +20,9 @@ import {
   MessageSquare,
   Sun,
   Moon,
+  Users,
 } from 'lucide-react';
+import { clearAllUserDataOnLogout } from '@/lib/client-drive';
 
 const MENU_ITEMS = [
   { name: 'Home', href: '/', icon: Home },
@@ -34,6 +36,7 @@ const MENU_ITEMS = [
   { name: 'Branding', href: '/branding', icon: ImageIcon },
   { name: 'Posts', href: '/posts', icon: ListOrdered },
   { name: 'Accounts', href: '/accounts/facebook', icon: Link2 },
+  { name: 'Users', href: '/admin/users', icon: Users, adminOnly: true },
   { name: 'Notifications', href: '/notifications', icon: Bell, badge: true },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
@@ -42,7 +45,11 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [currentUser, setCurrentUser] = useState({ name: 'Saurabh', email: 'saurabhprajapatidev@gmail.com' });
+  const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string; role?: string; id?: string }>({
+    name: 'Saurabh',
+    email: 'saurabhprajapatidev@gmail.com',
+    role: 'admin',
+  });
 
   useEffect(() => {
     // Notifications check
@@ -130,10 +137,15 @@ export default function Sidebar() {
   const handleLogout = async () => {
     if (confirm('Do you want to log out of PostNova?')) {
       await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-      localStorage.removeItem('postnova_user');
+      clearAllUserDataOnLogout();
       window.location.href = '/login';
     }
   };
+
+  const isAdmin =
+    currentUser.role === 'admin' ||
+    currentUser.email === 'saurabhprajapatidev@gmail.com' ||
+    currentUser.id === 'usr_admin_saurabh';
 
   return (
     <aside className="w-64 h-screen fixed top-0 left-0 bottom-0 bg-cream-50 dark:bg-stone-900 border-r border-cream-200/80 dark:border-stone-800 flex flex-col select-none shrink-0 overflow-hidden z-40 transition-colors">
@@ -153,6 +165,9 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
         <nav className="space-y-1">
           {MENU_ITEMS.map((item) => {
+            if ((item as any).adminOnly && !isAdmin) {
+              return null;
+            }
             const Icon = item.icon;
             const isWebsiteFeed = typeof window !== 'undefined' && window.location.search.includes('kind=feed');
             const isActive =

@@ -55,6 +55,21 @@ export function clearStoredDriveConfig(): void {
   }
 }
 
+export function clearAllUserDataOnLogout(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem('postnova_user');
+    localStorage.removeItem('postnova_token');
+    localStorage.removeItem(STORAGE_FOLDER_KEY);
+    localStorage.removeItem(STORAGE_JSON_KEY);
+    document.cookie = 'drive_folder=; path=/; max-age=0; SameSite=Lax';
+    document.cookie = 'drive_creds=; path=/; max-age=0; SameSite=Lax';
+    document.cookie = 'postnova_session=; path=/; max-age=0; SameSite=Lax';
+  } catch (err) {
+    console.warn('[client-drive] Failed to clear all user data on logout:', err);
+  }
+}
+
 export function getDriveHeaders(): Record<string, string> {
   const { folderId, jsonKey } = getStoredDriveConfig();
   const headers: Record<string, string> = {};
