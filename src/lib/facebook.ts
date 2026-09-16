@@ -7,6 +7,7 @@ export interface FacebookAccountInfo {
   id: string;
   name: string;
   access_token: string;
+  profile_picture_url?: string;
 }
 
 export function explainFacebookError(body: any): string {
@@ -40,7 +41,7 @@ export function explainFacebookError(body: any): string {
 }
 
 export async function fetchAccountsFromSystemUser(systemUserToken: string): Promise<FacebookAccountInfo[]> {
-  const url = `${GRAPH_BASE}/me/accounts?fields=name,id,access_token&access_token=${encodeURIComponent(systemUserToken)}`;
+  const url = `${GRAPH_BASE}/me/accounts?fields=name,id,access_token,picture{url}&access_token=${encodeURIComponent(systemUserToken)}`;
   const res = await fetch(url);
   const data = await res.json();
 
@@ -52,12 +53,13 @@ export async function fetchAccountsFromSystemUser(systemUserToken: string): Prom
     id: String(p.id),
     name: String(p.name),
     access_token: String(p.access_token),
+    profile_picture_url: p.picture?.data?.url || undefined,
   }));
 }
 
-export async function checkFacebookPage(pageId: string, pageToken: string): Promise<{ ok: boolean; name?: string; error?: string }> {
+export async function checkFacebookPage(pageId: string, pageToken: string): Promise<{ ok: boolean; name?: string; profile_picture_url?: string; error?: string }> {
   try {
-    const pageUrl = `${GRAPH_BASE}/${encodeURIComponent(pageId)}?fields=name,id&access_token=${encodeURIComponent(pageToken)}`;
+    const pageUrl = `${GRAPH_BASE}/${encodeURIComponent(pageId)}?fields=name,id,picture{url}&access_token=${encodeURIComponent(pageToken)}`;
     const pageRes = await fetch(pageUrl);
     const pageData = await pageRes.json();
 
@@ -65,9 +67,13 @@ export async function checkFacebookPage(pageId: string, pageToken: string): Prom
       return { ok: false, error: explainFacebookError(pageData) };
     }
 
-    return { ok: true, name: pageData.name };
+    return {
+      ok: true,
+      name: pageData.name,
+      profile_picture_url: pageData.picture?.data?.url || undefined,
+    };
   } catch (err: any) {
-    return { ok: false, error: err.message || 'Failed to connect to Meta Graph API' };
+    return { ok: false, error: err.message || 'Network error connecting to Facebook' };
   }
 }
 

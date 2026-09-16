@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { fetchWithDrive } from '@/lib/client-drive';
+import AccountSelector from '@/components/AccountSelector';
 
 interface Account {
   id: string;
@@ -30,6 +31,7 @@ interface Account {
   pageId: string;
   platform?: 'facebook' | 'instagram' | string;
   username?: string;
+  profilePictureUrl?: string;
   active: boolean;
 }
 
@@ -446,29 +448,15 @@ export default function BulkSchedulePage() {
 
               {/* Account Dropdown */}
               <div>
-                <label className="text-xs font-bold text-stone-600 block mb-1">Target Account / Platform</label>
+                <label className="text-xs font-bold text-stone-600 dark:text-stone-300 block mb-1">Target Account / Platform</label>
                 {accounts.length ? (
-                  <select
-                    value={selectedAccountId}
-                    onChange={(e) => setSelectedAccountId(e.target.value)}
-                    className="w-full text-xs font-bold p-2.5 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white text-stone-900"
-                  >
-                    {accounts.filter((a) => a.platform === 'instagram').map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        📸 Instagram: {acc.name} (@{acc.username || acc.name})
-                      </option>
-                    ))}
-                    {accounts.filter((a) => a.platform === 'facebook').map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        🟦 Facebook: {acc.name}
-                      </option>
-                    ))}
-                    <option value="both">
-                      🌐 Both Facebook & Instagram (Ek sath dono par)
-                    </option>
-                  </select>
+                  <AccountSelector
+                    accounts={accounts}
+                    selectedId={selectedAccountId}
+                    onSelect={(id) => setSelectedAccountId(id)}
+                  />
                 ) : (
-                  <div className="text-xs text-stone-400 p-2 bg-stone-50 rounded-xl">
+                  <div className="text-xs text-stone-400 p-2 bg-stone-50 dark:bg-stone-800 rounded-xl">
                     No accounts found.{' '}
                     <Link href="/accounts/facebook" className="text-amber-700 underline font-bold">
                       Connect in Accounts

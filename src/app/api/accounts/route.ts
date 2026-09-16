@@ -6,7 +6,17 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   const db = await getDbFromReq(req);
-  return NextResponse.json({ accounts: db.accounts }, {
+  const accountsWithPics = (db.accounts || []).map((acc) => {
+    if (acc.platform === 'facebook' && !acc.profilePictureUrl && acc.pageId) {
+      return {
+        ...acc,
+        profilePictureUrl: `https://graph.facebook.com/${acc.pageId}/picture?type=large`,
+      };
+    }
+    return acc;
+  });
+
+  return NextResponse.json({ accounts: accountsWithPics }, {
     headers: {
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
     },
@@ -27,6 +37,7 @@ export async function POST(req: Request) {
     let tokenToUse = pageAccessToken;
     let finalPageId = pageId;
     let pageName = name || 'Facebook Page';
+    let profilePic: string | undefined = undefined;
 
     // Auto-discover using System User token if provided
     if (systemUserToken) {
@@ -42,6 +53,7 @@ export async function POST(req: Request) {
         if (match) {
           tokenToUse = match.access_token;
           pageName = match.name;
+          profilePic = match.profile_picture_url;
         } else {
           return NextResponse.json({
             error: `Page ID ${finalPageId} does not belong to this token. Available Pages: ${pages.map((p) => `${p.name} (${p.id})`).join(', ')}`
@@ -53,6 +65,7 @@ export async function POST(req: Request) {
         finalPageId = first.id;
         tokenToUse = first.access_token;
         pageName = first.name;
+        profilePic = first.profile_picture_url;
       }
     } else {
       // Validate page token directly
@@ -61,6 +74,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: check.error || 'Token validation failed.' }, { status: 400 });
       }
       if (check.name) pageName = check.name;
+      if (check.profile_picture_url) profilePic = check.profile_picture_url;
+    }
+
+    if (!profilePic && finalPageId) {
+      profilePic = `https://graph.facebook.com/${finalPageId}/picture?type=large`;
     }
 
     // Check if account already exists
@@ -70,6 +88,7 @@ export async function POST(req: Request) {
       platform: 'facebook',
       pageId: finalPageId,
       name: pageName,
+      profilePictureUrl: profilePic,
       systemUserToken,
       pageAccessToken: tokenToUse,
       active: true,
