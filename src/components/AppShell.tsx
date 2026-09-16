@@ -17,9 +17,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-cream-100 dark:bg-[#0d0f12] text-stone-900 dark:text-stone-100 overflow-x-hidden transition-colors duration-200">
+    <div className="min-h-screen w-full bg-cream-100 dark:bg-[#0d0f12] text-stone-900 dark:text-stone-100 transition-colors duration-200">
       <Sidebar />
-      <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto">
+      <main className="ml-64 min-w-0 p-4 sm:p-6 lg:p-8 max-w-7xl">
         {children}
       </main>
     </div>

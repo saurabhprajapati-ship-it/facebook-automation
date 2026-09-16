@@ -98,18 +98,76 @@ export async function getMasterUsers(): Promise<MasterUser[]> {
   return [defaultAdmin];
 }
 
+export function createSessionToken(user: {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'user';
+  avatarUrl?: string;
+  driveFolderId?: string;
+}): string {
+  const payload = {
+    ...user,
+    exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
+  };
+  const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', SALT).update(data).digest('base64url');
+  return `${data}.${sig}`;
+}
+
+export function verifySessionToken(token: string): MasterUser | null {
+  if (!token || typeof token !== 'string' || !token.includes('.')) return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [data, sig] = parts;
+  if (!data || !sig) return null;
+
+  const expectedSig = crypto.createHmac('sha256', SALT).update(data).digest('base64url');
+  if (sig !== expectedSig) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));
+    if (payload.exp && payload.exp < Date.now()) return null;
+    return {
+      id: payload.id,
+      name: payload.name,
+      email: payload.email,
+      role: payload.role || 'user',
+      avatarUrl: payload.avatarUrl,
+      driveFolderId: payload.driveFolderId,
+      passwordHash: '',
+      createdAt: '',
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Extracts authenticated user from request cookie
+ * Extracts authenticated user from request cookie or Authorization header
  */
 export async function getUserFromReq(req: Request): Promise<MasterUser | null> {
   try {
+    // 1. Check Authorization header
+    const authHeader = req.headers.get('authorization') || '';
+    if (authHeader.startsWith('Bearer ')) {
+      const verified = verifySessionToken(authHeader.substring(7).trim());
+      if (verified) return verified;
+    }
+
+    // 2. Check Cookie
     const cookieHeader = req.headers.get('cookie') || '';
     const match = cookieHeader.match(/postnova_session=([^;]+)/);
-    const sessionId = match ? match[1] : null;
-    if (!sessionId) return null;
+    const sessionVal = match ? decodeURIComponent(match[1].trim()) : null;
+    if (sessionVal) {
+      const verified = verifySessionToken(sessionVal);
+      if (verified) return verified;
 
-    const users = await getMasterUsers();
-    return users.find((u) => u.id === sessionId) || null;
+      const users = await getMasterUsers();
+      return users.find((u) => u.id === sessionVal) || null;
+    }
+
+    return null;
   } catch {
     return null;
   }

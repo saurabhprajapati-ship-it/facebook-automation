@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getMasterUsers, saveMasterUsers, hashPassword, MasterUser } from '@/lib/auth-db';
+import { getMasterUsers, saveMasterUsers, hashPassword, createSessionToken } from '@/lib/auth-db';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,9 +45,11 @@ export async function POST(req: Request) {
       driveFolderId: user.driveFolderId,
     };
 
-    const res = NextResponse.json({ ok: true, user: safeUser });
+    const sessionToken = createSessionToken(safeUser);
 
-    res.cookies.set('postnova_session', user.id, {
+    const res = NextResponse.json({ ok: true, user: safeUser, token: sessionToken });
+
+    res.cookies.set('postnova_session', sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

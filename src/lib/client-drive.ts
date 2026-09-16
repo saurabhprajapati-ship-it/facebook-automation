@@ -87,6 +87,13 @@ export async function fetchWithDrive(input: RequestInfo | URL, init?: RequestIni
     }
   }
 
+  if (typeof window !== 'undefined' && !headers.has('Authorization')) {
+    const token = localStorage.getItem('postnova_token');
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  }
+
   return fetch(input, {
     ...init,
     headers,

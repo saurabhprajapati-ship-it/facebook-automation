@@ -40,6 +40,9 @@ export default function LoginPage() {
       if (data.user) {
         localStorage.setItem('postnova_user', JSON.stringify(data.user));
       }
+      if (data.token) {
+        localStorage.setItem('postnova_token', data.token);
+      }
 
       setSuccessMsg(tab === 'login' ? 'Logged in successfully! Redirecting...' : 'Account created successfully! Redirecting...');
 
@@ -125,6 +128,9 @@ export default function LoginPage() {
 
             if (data.user) {
               localStorage.setItem('postnova_user', JSON.stringify(data.user));
+            }
+            if (data.token) {
+              localStorage.setItem('postnova_token', data.token);
             }
 
             setSuccessMsg(`Signed in with Google as ${profile.name || profile.email}! Redirecting...`);

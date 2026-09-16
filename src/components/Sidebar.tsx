@@ -66,6 +66,17 @@ export default function Sidebar() {
       setIsDarkMode(false);
     }
 
+    // Initialize user immediately from localStorage to prevent any redirect flicker
+    try {
+      const savedUser = localStorage.getItem('postnova_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed?.name || parsed?.email) {
+          setCurrentUser(parsed);
+        }
+      }
+    } catch {}
+
     // User session verification from server
     fetch('/api/auth/me')
       .then((r) => r.json())
@@ -76,6 +87,18 @@ export default function Sidebar() {
             localStorage.setItem('postnova_user', JSON.stringify(data.user));
           } catch {}
         } else {
+          // Check if we have an active user in localStorage before redirecting
+          try {
+            const saved = localStorage.getItem('postnova_user');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (parsed?.email) {
+                setCurrentUser(parsed);
+                return; // Don't redirect if user is logged in locally
+              }
+            }
+          } catch {}
+
           if (pathname !== '/login') {
             window.location.href = '/login';
           }
@@ -113,7 +136,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 h-screen sticky top-0 bg-cream-50 dark:bg-stone-900 border-r border-cream-200/80 dark:border-stone-800 flex flex-col select-none shrink-0 overflow-hidden z-30 transition-colors">
+    <aside className="w-64 h-screen fixed top-0 left-0 bottom-0 bg-cream-50 dark:bg-stone-900 border-r border-cream-200/80 dark:border-stone-800 flex flex-col select-none shrink-0 overflow-hidden z-40 transition-colors">
       {/* 1. Pinned Logo Header (Never scrolls) */}
       <div className="p-4 pb-3 shrink-0 border-b border-cream-200/50 dark:border-stone-800/80 bg-cream-50/90 dark:bg-stone-900/90 backdrop-blur-xs">
         <Link href="/" className="flex items-center gap-2.5 px-2 py-1 group">
