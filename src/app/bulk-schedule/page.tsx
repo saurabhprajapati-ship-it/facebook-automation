@@ -76,10 +76,42 @@ export default function BulkSchedulePage() {
   const todayStr = new Date().toISOString().split('T')[0];
   const [startDate, setStartDate] = useState(todayStr);
   const [startTime, setStartTime] = useState('09:00');
+  const [timePeriod, setTimePeriod] = useState<'AM' | 'PM'>('AM');
   const [postsPerDay, setPostsPerDay] = useState(24);
   const [intervalMinutes, setIntervalMinutes] = useState(60); // 1 hour
+  const [intervalOption, setIntervalOption] = useState<string>('60');
+  const [customIntervalMinutes, setCustomIntervalMinutes] = useState<number>(2);
   const [pairWithNext, setPairWithNext] = useState(false);
-  const [addJitter, setAddJitter] = useState(true);
+  const [addJitter, setAddJitter] = useState(false);
+
+  const handleTimeChange = (newVal: string) => {
+    setStartTime(newVal);
+    const [h] = (newVal || '09:00').split(':').map(Number);
+    setTimePeriod(h >= 12 ? 'PM' : 'AM');
+  };
+
+  const handlePeriodToggle = (targetPeriod: 'AM' | 'PM') => {
+    let [h, m] = (startTime || '09:00').split(':').map(Number);
+    if (isNaN(h)) h = 9;
+    if (isNaN(m)) m = 0;
+    if (targetPeriod === 'PM' && h < 12) {
+      h += 12;
+    } else if (targetPeriod === 'AM' && h >= 12) {
+      h -= 12;
+    }
+    const updated = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    setStartTime(updated);
+    setTimePeriod(targetPeriod);
+  };
+
+  const handleIntervalOptionChange = (opt: string) => {
+    setIntervalOption(opt);
+    if (opt === 'custom') {
+      setIntervalMinutes(customIntervalMinutes || 2);
+    } else {
+      setIntervalMinutes(Number(opt));
+    }
+  };
 
   // Sync / Preview State
   const [syncing, setSyncing] = useState(false);
@@ -174,6 +206,13 @@ export default function BulkSchedulePage() {
         throw new Error('Please connect and select a Facebook Page');
       }
 
+      // Compute precise local start ISO string and timezone offset
+      const [startHour, startMin] = (startTime || '09:00').split(':').map(Number);
+      const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+      const localStartDate = new Date(startYear, startMonth - 1, startDay, startHour, startMin, 0, 0);
+      const startIso = localStartDate.toISOString();
+      const clientTimezoneOffset = new Date().getTimezoneOffset();
+
       const res = await fetchWithDrive('/api/bulk/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,6 +224,8 @@ export default function BulkSchedulePage() {
           calendarConfig: {
             startDate,
             startTime,
+            startIso,
+            clientTimezoneOffset,
             postsPerDay: Number(postsPerDay),
             intervalMinutes: Number(intervalMinutes),
             pairWithNext,
@@ -617,15 +658,47 @@ export default function BulkSchedulePage() {
                 />
               </div>
 
-              {/* Start Time */}
+              {/* Start Time with 12-Hour AM/PM Toggle */}
               <div>
-                <label className="font-bold text-stone-600 block mb-1">Start Time</label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-stone-200 font-semibold"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-stone-600">Start Time</label>
+                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300/60">
+                    {timePeriod}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => handleTimeChange(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-stone-200 font-semibold text-xs"
+                  />
+                  <div className="flex rounded-xl overflow-hidden border border-stone-200 shrink-0 bg-stone-100 text-[11px] font-black shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => handlePeriodToggle('AM')}
+                      className={`px-2.5 py-2 transition cursor-pointer ${
+                        timePeriod === 'AM'
+                          ? 'bg-amber-400 text-amber-950 font-black shadow-xs'
+                          : 'text-stone-500 hover:text-stone-800'
+                      }`}
+                    >
+                      AM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePeriodToggle('PM')}
+                      className={`px-2.5 py-2 transition cursor-pointer ${
+                        timePeriod === 'PM'
+                          ? 'bg-amber-400 text-amber-950 font-black shadow-xs'
+                          : 'text-stone-500 hover:text-stone-800'
+                      }`}
+                    >
+                      PM
+                    </button>
+                  </div>
+                </div>
+                <span className="text-[10px] text-stone-400">Click AM / PM to toggle morning or evening</span>
               </div>
 
               {/* Posts Per Day */}
@@ -634,7 +707,7 @@ export default function BulkSchedulePage() {
                 <input
                   type="number"
                   min={1}
-                  max={48}
+                  max={100}
                   value={postsPerDay}
                   onChange={(e) => setPostsPerDay(Number(e.target.value))}
                   className="w-full p-2.5 rounded-xl border border-stone-200 font-semibold"
@@ -642,20 +715,46 @@ export default function BulkSchedulePage() {
                 <span className="text-[10px] text-stone-400">Default: 24 posts daily</span>
               </div>
 
-              {/* Interval */}
+              {/* Interval with 1m, 2m, 5m & Custom */}
               <div>
                 <label className="font-bold text-stone-600 block mb-1">Interval Between Posts</label>
                 <select
-                  value={intervalMinutes}
-                  onChange={(e) => setIntervalMinutes(Number(e.target.value))}
-                  className="w-full p-2.5 rounded-xl border border-stone-200 font-semibold"
+                  value={intervalOption}
+                  onChange={(e) => handleIntervalOptionChange(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-stone-200 font-semibold text-xs"
                 >
-                  <option value={60}>Every 1 Hour (24/day)</option>
-                  <option value={30}>Every 30 Minutes (48/day)</option>
-                  <option value={120}>Every 2 Hours (12/day)</option>
-                  <option value={180}>Every 3 Hours (8/day)</option>
-                  <option value={360}>Every 6 Hours (4/day)</option>
+                  <option value="1">⚡ Every 1 Minute (Fast Test)</option>
+                  <option value="2">⚡ Every 2 Minutes (Fast Test)</option>
+                  <option value="5">Every 5 Minutes (Test)</option>
+                  <option value="10">Every 10 Minutes</option>
+                  <option value="15">Every 15 Minutes</option>
+                  <option value="30">Every 30 Minutes (48/day)</option>
+                  <option value="60">Every 1 Hour (24/day)</option>
+                  <option value="120">Every 2 Hours (12/day)</option>
+                  <option value="180">Every 3 Hours (8/day)</option>
+                  <option value="360">Every 6 Hours (4/day)</option>
+                  <option value="custom">⚙️ Custom Minutes...</option>
                 </select>
+
+                {intervalOption === 'custom' && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={1440}
+                      value={customIntervalMinutes}
+                      onChange={(e) => {
+                        const val = Math.max(1, Number(e.target.value));
+                        setCustomIntervalMinutes(val);
+                        setIntervalMinutes(val);
+                      }}
+                      className="w-full p-2 rounded-xl border border-amber-400 font-bold text-xs bg-amber-50/60 focus:bg-white"
+                      placeholder="e.g. 3"
+                    />
+                    <span className="text-[11px] font-extrabold text-stone-600 shrink-0">min</span>
+                  </div>
+                )}
+                <span className="text-[10px] text-stone-400">Spacing: {intervalMinutes} min between each post</span>
               </div>
             </div>
 

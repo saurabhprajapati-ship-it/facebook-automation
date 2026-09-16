@@ -23,12 +23,24 @@ export async function POST(req: Request) {
 
     const { accountName, accountId, ...brandingFields } = body;
 
-    // Persist custom account name if provided
+    // Persist all custom account names if provided in customAccountNames map
+    if (brandingFields.customAccountNames && typeof brandingFields.customAccountNames === 'object') {
+      for (const [id, customName] of Object.entries(brandingFields.customAccountNames)) {
+        if (customName && typeof customName === 'string') {
+          const acc = db.accounts.find((a) => a.id === id || a.pageId === id);
+          if (acc) {
+            acc.name = customName.trim();
+          }
+        }
+      }
+    }
+
+    // Persist single custom account name if provided
     if (accountName && typeof accountName === 'string') {
       const trimmed = accountName.trim();
       if (trimmed && db.accounts.length > 0) {
         const targetId = accountId || db.accounts[0].id;
-        const acc = db.accounts.find((a) => a.id === targetId) || db.accounts[0];
+        const acc = db.accounts.find((a) => a.id === targetId || a.pageId === targetId) || db.accounts[0];
         acc.name = trimmed;
         if (!brandingFields.customAccountNames) {
           brandingFields.customAccountNames = db.branding.customAccountNames || {};

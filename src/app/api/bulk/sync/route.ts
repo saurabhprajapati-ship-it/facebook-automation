@@ -68,6 +68,8 @@ export async function POST(req: Request) {
     const fullConfig: CalendarConfig = {
       startDate: calendarConfig.startDate || todayStr,
       startTime: calendarConfig.startTime || '09:00',
+      startIso: calendarConfig.startIso,
+      clientTimezoneOffset: calendarConfig.clientTimezoneOffset !== undefined ? Number(calendarConfig.clientTimezoneOffset) : undefined,
       postsPerDay: Number(calendarConfig.postsPerDay) || 24,
       intervalMinutes: Number(calendarConfig.intervalMinutes) || 60,
       pairWithNext: Boolean(calendarConfig.pairWithNext),

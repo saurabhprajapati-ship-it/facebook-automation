@@ -52,7 +52,7 @@ export default function Sidebar() {
   }, [pathname]);
 
   return (
-    <aside className="w-64 min-h-screen bg-cream-50 border-r border-cream-200/80 flex flex-col justify-between p-4 select-none shrink-0">
+    <aside className="w-64 h-screen sticky top-0 bg-cream-50 border-r border-cream-200/80 flex flex-col justify-between p-4 select-none shrink-0 overflow-y-auto z-30">
       <div>
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 px-3 py-4 mb-3 group">
