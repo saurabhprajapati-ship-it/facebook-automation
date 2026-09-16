@@ -1,12 +1,47 @@
-'use client';
+﻿'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Menu, Bell } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
+import MobileNavBar from '@/components/MobileNavBar';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const isLoginPage = pathname === '/login';
+
+  // Automatically close mobile menu when navigating to another page
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Lock background scroll when mobile drawer is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  // Check unread notifications count for mobile header badge
+  useEffect(() => {
+    fetch('/api/notifications')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.notifications) {
+          setUnreadCount(data.notifications.length);
+        }
+      })
+      .catch(() => {});
+  }, [pathname]);
 
   if (isLoginPage) {
     return (
@@ -18,10 +53,51 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen w-full bg-cream-100 dark:bg-[#0d0f12] text-stone-900 dark:text-stone-100 transition-colors duration-200">
-      <Sidebar />
-      <main className="ml-64 min-w-0 p-4 sm:p-6 lg:p-8 max-w-7xl">
+      {/* 1. TOP MOBILE APP BAR (Mobile & Tablet only) */}
+      <header className="fixed top-0 left-0 right-0 h-14 z-30 lg:hidden bg-cream-50/95 dark:bg-stone-900/95 backdrop-blur-md border-b border-cream-200/90 dark:border-stone-800/90 px-4 flex items-center justify-between transition-colors duration-200">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            type="button"
+            className="p-2 -ml-1.5 rounded-xl text-stone-700 dark:text-stone-200 hover:bg-cream-200/60 dark:hover:bg-stone-800 active:scale-95 transition"
+            aria-label="Open navigation menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-xl bg-amber-500 flex items-center justify-center text-white font-black text-sm shadow-xs">
+              ✦
+            </div>
+            <div className="font-extrabold text-lg tracking-tight text-stone-900 dark:text-white">
+              Post<span className="text-amber-500 font-black">Nova</span>
+            </div>
+          </Link>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/notifications"
+            className="relative p-2 rounded-xl text-stone-600 dark:text-stone-300 hover:bg-cream-200/60 dark:hover:bg-stone-800 transition"
+            aria-label="Notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500" />
+            )}
+          </Link>
+        </div>
+      </header>
+
+      {/* 2. SIDEBAR (Fixed Desktop & Sliding Mobile Drawer) */}
+      <Sidebar mobileOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+
+      {/* 3. MAIN APP VIEWPORT */}
+      <main className="lg:ml-64 ml-0 pt-14 pb-20 lg:pt-0 lg:pb-0 min-w-0 p-3 sm:p-6 lg:p-8 max-w-7xl overflow-x-hidden">
         {children}
       </main>
+
+      {/* 4. BOTTOM THUMB NAVIGATION BAR (Mobile & Tablet only) */}
+      <MobileNavBar />
     </div>
   );
 }

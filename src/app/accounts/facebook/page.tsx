@@ -157,7 +157,7 @@ export default function FacebookAccountsPage() {
                 </span>
                 <p>
                   Press <strong>Generate new token</strong>, pick your app, set expiry to <strong>Never</strong>, and tick:
-                  <span className="block mt-1 font-mono font-bold text-amber-900 bg-amber-50 p-1.5 rounded-lg">
+                  <span className="block mt-1 font-mono font-bold text-amber-900 bg-amber-50 p-1.5 rounded-lg break-words text-[11px] leading-relaxed">
                     pages_show_list, pages_read_engagement, pages_manage_posts
                   </span>
                 </p>

@@ -46,6 +46,7 @@ export default function BrandingPage() {
   const [accountName, setAccountName] = useState('Money Mind set');
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'settings' | 'preview'>('settings');
 
   useEffect(() => {
     // 1. Instant local restore to prevent refresh clearing
@@ -190,9 +191,35 @@ export default function BrandingPage() {
         </div>
       )}
 
+      {/* Mobile Tab Switcher (Visible only on mobile/tablet) */}
+      <div className="flex lg:hidden items-center p-1 bg-cream-200/70 dark:bg-stone-800/80 rounded-2xl border border-cream-300/60 dark:border-stone-700/60 w-full mb-2">
+        <button
+          type="button"
+          onClick={() => setMobileTab('settings')}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${
+            mobileTab === 'settings'
+              ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs'
+              : 'text-stone-600 dark:text-stone-400'
+          }`}
+        >
+          ⚙️ Settings
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('preview')}
+          className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${
+            mobileTab === 'preview'
+              ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs'
+              : 'text-stone-600 dark:text-stone-400'
+          }`}
+        >
+          👁️ Live Preview
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Form Controls (7 cols) */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className={`lg:col-span-7 space-y-6 ${mobileTab === 'settings' ? 'block' : 'hidden lg:block'}`}>
           <div className="bg-white rounded-3xl p-6 border border-cream-200/80 shadow-soft space-y-6">
             {/* WHERE */}
             <div className="space-y-3">
@@ -650,7 +677,7 @@ export default function BrandingPage() {
         </div>
 
         {/* Right Column: Live Dual Preview (5 cols) */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className={`lg:col-span-5 space-y-4 ${mobileTab === 'preview' ? 'block' : 'hidden lg:block'}`}>
           <BrandingPreview branding={branding} accountName={accountName} />
         </div>
       </div>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -21,6 +21,7 @@ import {
   Sun,
   Moon,
   Users,
+  X,
 } from 'lucide-react';
 import { clearAllUserDataOnLogout } from '@/lib/client-drive';
 
@@ -41,7 +42,12 @@ const MENU_ITEMS = [
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -94,14 +100,13 @@ export default function Sidebar() {
             localStorage.setItem('postnova_user', JSON.stringify(data.user));
           } catch {}
         } else {
-          // Check if we have an active user in localStorage before redirecting
           try {
             const saved = localStorage.getItem('postnova_user');
             if (saved) {
               const parsed = JSON.parse(saved);
               if (parsed?.email) {
                 setCurrentUser(parsed);
-                return; // Don't redirect if user is logged in locally
+                return;
               }
             }
           } catch {}
@@ -147,11 +152,15 @@ export default function Sidebar() {
     currentUser.email === 'saurabhprajapatidev@gmail.com' ||
     currentUser.id === 'usr_admin_saurabh';
 
-  return (
-    <aside className="w-64 h-screen fixed top-0 left-0 bottom-0 bg-cream-50 dark:bg-stone-900 border-r border-cream-200/80 dark:border-stone-800 flex flex-col select-none shrink-0 overflow-hidden z-40 transition-colors">
-      {/* 1. Pinned Logo Header (Never scrolls) */}
-      <div className="p-4 pb-3 shrink-0 border-b border-cream-200/50 dark:border-stone-800/80 bg-cream-50/90 dark:bg-stone-900/90 backdrop-blur-xs">
-        <Link href="/" className="flex items-center gap-2.5 px-2 py-1 group">
+  const renderContent = (isMobileView: boolean) => (
+    <>
+      {/* 1. Logo Header */}
+      <div className="p-4 pb-3 shrink-0 border-b border-cream-200/50 dark:border-stone-800/80 bg-cream-50/90 dark:bg-stone-900/90 backdrop-blur-xs flex items-center justify-between">
+        <Link
+          href="/"
+          onClick={() => isMobileView && onClose?.()}
+          className="flex items-center gap-2.5 px-2 py-1 group"
+        >
           <div className="w-9 h-9 rounded-2xl bg-amber-500 flex items-center justify-center text-white font-black text-xl shadow-sm group-hover:rotate-12 transition-transform duration-300">
             ✦
           </div>
@@ -159,9 +168,19 @@ export default function Sidebar() {
             Post<span className="text-amber-500 font-black">Nova</span>
           </div>
         </Link>
+        {isMobileView && (
+          <button
+            onClick={onClose}
+            type="button"
+            className="p-2 rounded-xl text-stone-500 hover:text-stone-900 dark:hover:text-white hover:bg-cream-200/60 dark:hover:bg-stone-800 transition"
+            aria-label="Close navigation"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
-      {/* 2. Scrollable Navigation Tools (Only these tools scroll) */}
+      {/* 2. Scrollable Navigation Tools */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
         <nav className="space-y-1">
           {MENU_ITEMS.map((item) => {
@@ -185,6 +204,7 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={() => isMobileView && onClose?.()}
                 className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-150 ${
                   isActive
                     ? 'bg-amber-100/80 dark:bg-amber-500/20 text-amber-950 dark:text-amber-300 shadow-xs border border-amber-300/60 dark:border-amber-500/30 font-bold'
@@ -215,7 +235,7 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      {/* 3. Pinned User Profile & Theme Controls (Never scrolls) */}
+      {/* 3. Pinned User Profile & Theme Controls */}
       <div className="p-3 pt-3 border-t border-cream-200/80 dark:border-stone-800 shrink-0 bg-cream-50 dark:bg-stone-900">
         <div className="flex items-center justify-between px-2 mb-2">
           <span className="text-[10px] font-bold tracking-wider uppercase text-stone-400 dark:text-stone-500">Theme</span>
@@ -258,6 +278,40 @@ export default function Sidebar() {
           <span>Log out</span>
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* DESKTOP FIXED SIDEBAR */}
+      <aside className="hidden lg:flex w-64 h-screen fixed top-0 left-0 bottom-0 bg-cream-50 dark:bg-stone-900 border-r border-cream-200/80 dark:border-stone-800 flex-col select-none shrink-0 overflow-hidden z-40 transition-colors">
+        {renderContent(false)}
+      </aside>
+
+      {/* MOBILE SLIDE-OUT DRAWER */}
+      <div
+        className={`fixed inset-0 z-50 lg:hidden transition-all duration-300 ${
+          mobileOpen ? 'visible pointer-events-auto' : 'invisible pointer-events-none'
+        }`}
+        aria-hidden={!mobileOpen}
+      >
+        {/* Backdrop */}
+        <div
+          onClick={onClose}
+          className={`absolute inset-0 bg-stone-950/60 backdrop-blur-xs transition-opacity duration-300 ${
+            mobileOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+
+        {/* Drawer panel */}
+        <aside
+          className={`relative w-72 max-w-[85vw] h-full bg-cream-50 dark:bg-stone-900 border-r border-cream-200/80 dark:border-stone-800 flex flex-col select-none shadow-2xl transition-transform duration-300 ease-out ${
+            mobileOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          {renderContent(true)}
+        </aside>
+      </div>
+    </>
   );
 }
