@@ -1,6 +1,39 @@
 // Headline banner & branding overlay compositor with Sharp integration
 import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
 import { removeWatermark, WatermarkMode } from './watermark-remover';
+
+// Configure fontconfig for Vercel Serverless / Linux environment
+const possibleFontsDirs = [
+  path.join(process.cwd(), 'fonts'),
+  path.join('/var/task', 'fonts'),
+];
+
+let fontsDirFound = '';
+for (const dir of possibleFontsDirs) {
+  try {
+    if (fs.existsSync(dir)) {
+      fontsDirFound = dir;
+      process.env.FONTCONFIG_PATH = dir;
+      process.env.FONTCONFIG_FILE = path.join(dir, 'fonts.conf');
+      break;
+    }
+  } catch {}
+}
+
+// Pre-load Poppins-Bold font as base64 for embedding in SVG
+let poppinsBoldBase64 = '';
+if (fontsDirFound) {
+  try {
+    const boldPath = path.join(fontsDirFound, 'Poppins-Bold.ttf');
+    if (fs.existsSync(boldPath)) {
+      poppinsBoldBase64 = fs.readFileSync(boldPath).toString('base64');
+    }
+  } catch (err) {
+    console.warn('Failed to read Poppins-Bold.ttf:', err);
+  }
+}
 
 export interface BannerOptions {
   title?: string;
@@ -26,12 +59,16 @@ export function generateBannerSvg(options: BannerOptions, width: number = 1080, 
     bottomText,
     barColor = '#E60023',
     textColor = '#FFFFFF',
-    font = 'Poppins, sans-serif',
+    font = 'Poppins',
     look = '3D',
     headlineBanner = false,
     showTopBadge = false,
     showBottomBar = true,
   } = options;
+
+  const safeFont = font && font !== 'Poppins'
+    ? `${font}, 'Poppins', 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif`
+    : `'Poppins', 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif`;
 
   // Split title into 2-3 punchy uppercase lines (if headline banner is requested)
   let displayLines: string[] = [];
@@ -67,6 +104,16 @@ export function generateBannerSvg(options: BannerOptions, width: number = 1080, 
 <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     ${shadowFilter}
+    ${poppinsBoldBase64 ? `
+    <style>
+      @font-face {
+        font-family: 'Poppins';
+        src: url(data:font/truetype;charset=utf-8;base64,${poppinsBoldBase64}) format('truetype');
+        font-weight: 700;
+        font-style: normal;
+      }
+    </style>
+    ` : ''}
     <linearGradient id="bottomGrad" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
       <stop offset="50%" stop-color="rgba(0,0,0,0.4)"/>
@@ -84,7 +131,7 @@ export function generateBannerSvg(options: BannerOptions, width: number = 1080, 
   <g transform="translate(48, 48)">
     <rect x="0" y="0" width="${accountName.length * 16 + 70}" height="46" rx="23" fill="${barColor}" ${look === '3D' ? 'filter="url(#pillShadow)"' : ''}/>
     <circle cx="24" cy="23" r="5" fill="#FFFFFF"/>
-    <text x="38" y="29" font-family="${font}" font-size="20" font-weight="700" fill="${textColor}" letter-spacing="0.5">${accountName}</text>
+    <text x="38" y="29" font-family="${safeFont}" font-size="20" font-weight="700" fill="${textColor}" letter-spacing="0.5">${accountName}</text>
   </g>
   ` : ''}
 
@@ -97,7 +144,7 @@ export function generateBannerSvg(options: BannerOptions, width: number = 1080, 
       return `
       <g transform="translate(0, ${y})">
         <rect x="0" y="0" width="${estWidth}" height="${lineHeight}" rx="${pillRadius}" fill="${barColor}" ${look === '3D' ? 'filter="url(#pillShadow)"' : ''}/>
-        <text x="22" y="${lineHeight - 20}" font-family="${font}" font-size="38" font-weight="900" fill="${textColor}" letter-spacing="1">${line}</text>
+        <text x="22" y="${lineHeight - 20}" font-family="${safeFont}" font-size="38" font-weight="900" fill="${textColor}" letter-spacing="1">${line}</text>
       </g>
       `;
     }).join('\n')}
@@ -109,8 +156,8 @@ export function generateBannerSvg(options: BannerOptions, width: number = 1080, 
   <g transform="translate(0, ${height - barHeight})">
     <rect x="0" y="0" width="${width}" height="${barHeight}" fill="#0b0b0b" opacity="0.94"/>
     <circle cx="${Math.round(width * 0.045)}" cy="${barHeight / 2}" r="5" fill="${barColor}"/>
-    <text x="${Math.round(width * 0.065)}" y="${Math.round(barHeight * 0.62)}" font-family="${font}" font-size="${Math.max(16, Math.round(barHeight * 0.32))}" font-weight="700" fill="#FFFFFF">${accountName || 'PostNova'}</text>
-    <text x="${width - 48}" y="${Math.round(barHeight * 0.62)}" text-anchor="end" font-family="${font}" font-size="${Math.max(15, Math.round(barHeight * 0.30))}" font-weight="500" fill="#e5e5e5">${bottomText || 'For more content, Like and Share'}</text>
+    <text x="${Math.round(width * 0.065)}" y="${Math.round(barHeight * 0.62)}" font-family="${safeFont}" font-size="${Math.max(16, Math.round(barHeight * 0.32))}" font-weight="700" fill="#FFFFFF">${accountName || 'PostNova'}</text>
+    <text x="${width - 48}" y="${Math.round(barHeight * 0.62)}" text-anchor="end" font-family="${safeFont}" font-size="${Math.max(15, Math.round(barHeight * 0.30))}" font-weight="500" fill="#e5e5e5">${bottomText || 'For more content, Like and Share'}</text>
   </g>
   ` : ''}
 </svg>

@@ -209,11 +209,36 @@ export async function POST(req: Request) {
       // 2. Post to Instagram
       if (igAccount) {
         try {
+          let igPublishBuffer = buffer;
+          let igFinalMime = mimeType;
+          if (!isVideo && branding?.enabledOnAuto !== false) {
+            try {
+              const igDisplayName = branding?.customAccountNames?.[igAccount.id] || (igAccount.username ? `@${igAccount.username}` : igAccount.name);
+              igPublishBuffer = await processBrandedImageBuffer(buffer, {
+                accountName: igDisplayName,
+                bottomText: branding?.bottomText || 'For more content, Like and Share',
+                barColor: branding?.barColor || '#E60023',
+                textColor: branding?.textColor || '#FFFFFF',
+                font: branding?.font || 'Poppins',
+                look: branding?.look || '3D',
+                headlineBanner: Boolean(branding?.headlineBanner),
+                showTopBadge: Boolean(branding?.showTopBadge),
+                showBottomBar: branding?.showBottomBar !== false,
+                watermarkMode: branding?.watermarkMode || 'logo_stamp',
+                logoUrl: branding?.logoUrl,
+                pageId: igAccount.pageId,
+              });
+              igFinalMime = 'image/jpeg';
+            } catch (brandErr) {
+              console.warn('Failed to apply branding for IG bulk post:', brandErr);
+            }
+          }
+
           const cdnUrl = await uploadBufferToMetaCdn(
             igAccount.pageId,
-            buffer,
+            igPublishBuffer,
             name || item.fileName,
-            mimeType,
+            igFinalMime,
             igAccount.pageAccessToken
           );
           const igUserId = igAccount.igUserId || igAccount.pageId;

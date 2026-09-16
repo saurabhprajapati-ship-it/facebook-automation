@@ -306,11 +306,36 @@ async function handleCron(req: Request) {
         // 2. Post to Instagram
         if (igAccount) {
           try {
+            let igBuffer = buffer;
+            let igMime = mimeType;
+            if (!isVideo && branding?.enabledOnAuto !== false) {
+              try {
+                const igDisplayName = branding?.customAccountNames?.[igAccount.id] || (igAccount.username ? `@${igAccount.username}` : igAccount.name);
+                igBuffer = await processBrandedImageBuffer(buffer, {
+                  accountName: igDisplayName,
+                  bottomText: branding?.bottomText || 'For more content, Like and Share',
+                  barColor: branding?.barColor || '#E60023',
+                  textColor: branding?.textColor || '#FFFFFF',
+                  font: branding?.font || 'Poppins',
+                  look: branding?.look || '3D',
+                  headlineBanner: Boolean(branding?.headlineBanner),
+                  showTopBadge: Boolean(branding?.showTopBadge),
+                  showBottomBar: branding?.showBottomBar !== false,
+                  watermarkMode: branding?.watermarkMode || 'logo_stamp',
+                  logoUrl: branding?.logoUrl,
+                  pageId: igAccount.pageId,
+                });
+                igMime = 'image/jpeg';
+              } catch (brandErr) {
+                console.warn('Failed to apply branding for IG in cron:', brandErr);
+              }
+            }
+
             const cdnUrl = await uploadBufferToMetaCdn(
               igAccount.pageId,
-              buffer,
+              igBuffer,
               name || item.fileName,
-              mimeType,
+              igMime,
               igAccount.pageAccessToken
             );
             const igUserId = igAccount.igUserId || igAccount.pageId;

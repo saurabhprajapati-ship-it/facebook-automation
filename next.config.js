@@ -6,6 +6,11 @@ const nextConfig = {
       { protocol: 'http', hostname: '**' },
     ],
   },
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/**/*': ['./fonts/**/*'],
+    },
+  },
 };
 
 module.exports = nextConfig;

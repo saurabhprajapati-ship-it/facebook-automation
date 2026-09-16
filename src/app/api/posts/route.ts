@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDbFromReq, saveDbAsync, extractDriveFromReq, PostRecord } from '@/lib/db';
 import { publishToFacebook, publishBufferToFacebook } from '@/lib/facebook';
-import { publishInstagramFeedPost } from '@/lib/instagram';
+import { publishInstagramFeedPost, uploadBufferToMetaCdn } from '@/lib/instagram';
 import { processBrandedImageUrl } from '@/lib/image-banner';
 
 export const dynamic = 'force-dynamic';
@@ -103,7 +103,37 @@ export async function POST(req: Request) {
           );
         }
         const igUserId = igAccount.igUserId || igAccount.pageId;
-        const igRes = await publishInstagramFeedPost(igUserId, imageUrl, finalMessage, igAccount.pageAccessToken);
+        let igImageUrl = imageUrl;
+        if (applyBranding && db.branding) {
+          try {
+            const igDisplayName = db.branding.customAccountNames?.[igAccount.id] || (igAccount.username ? `@${igAccount.username}` : igAccount.name);
+            const brandedBuffer = await processBrandedImageUrl(imageUrl, {
+              title: '',
+              accountName: igDisplayName,
+              bottomText: db.branding.bottomText,
+              barColor: db.branding.barColor,
+              textColor: db.branding.textColor,
+              font: db.branding.font,
+              look: db.branding.look,
+              headlineBanner: Boolean(db.branding.headlineBanner),
+              showTopBadge: Boolean(db.branding.showTopBadge),
+              showBottomBar: db.branding.showBottomBar !== false,
+              watermarkMode: db.branding.watermarkMode || 'logo_stamp',
+              logoUrl: db.branding.logoUrl,
+              pageId: igAccount.pageId,
+            });
+            igImageUrl = await uploadBufferToMetaCdn(
+              igAccount.pageId,
+              brandedBuffer,
+              'post.jpg',
+              'image/jpeg',
+              igAccount.pageAccessToken
+            );
+          } catch (brandErr) {
+            console.warn('Failed to apply branding for IG in posts route, using raw image:', brandErr);
+          }
+        }
+        const igRes = await publishInstagramFeedPost(igUserId, igImageUrl, finalMessage, igAccount.pageAccessToken);
         if (igRes.ok && igRes.postId) {
           publishedIds.push(igRes.postId);
           db.posts.unshift({
@@ -147,7 +177,37 @@ export async function POST(req: Request) {
         );
       }
       const igUserId = account.igUserId || account.pageId;
-      const res = await publishInstagramFeedPost(igUserId, imageUrl, finalMessage, account.pageAccessToken);
+      let igImageUrl = imageUrl;
+      if (applyBranding && db.branding) {
+        try {
+          const igDisplayName = db.branding.customAccountNames?.[account.id] || (account.username ? `@${account.username}` : account.name);
+          const brandedBuffer = await processBrandedImageUrl(imageUrl, {
+            title: '',
+            accountName: igDisplayName,
+            bottomText: db.branding.bottomText,
+            barColor: db.branding.barColor,
+            textColor: db.branding.textColor,
+            font: db.branding.font,
+            look: db.branding.look,
+            headlineBanner: Boolean(db.branding.headlineBanner),
+            showTopBadge: Boolean(db.branding.showTopBadge),
+            showBottomBar: db.branding.showBottomBar !== false,
+            watermarkMode: db.branding.watermarkMode || 'logo_stamp',
+            logoUrl: db.branding.logoUrl,
+            pageId: account.pageId,
+          });
+          igImageUrl = await uploadBufferToMetaCdn(
+            account.pageId,
+            brandedBuffer,
+            'post.jpg',
+            'image/jpeg',
+            account.pageAccessToken
+          );
+        } catch (brandErr) {
+          console.warn('Failed to apply branding for single IG in posts route, using raw image:', brandErr);
+        }
+      }
+      const res = await publishInstagramFeedPost(igUserId, igImageUrl, finalMessage, account.pageAccessToken);
       if (!res.ok || !res.postId) {
         return NextResponse.json({ error: res.error || 'Failed to post to Instagram' }, { status: 500 });
       }

@@ -1,5 +1,37 @@
 import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
 import { detectStarWatermarkWithAi } from './gemini';
+
+// Configure fontconfig for Vercel Serverless / Linux environment
+const possibleFontsDirs = [
+  path.join(process.cwd(), 'fonts'),
+  path.join('/var/task', 'fonts'),
+];
+
+let fontsDirFound = '';
+for (const dir of possibleFontsDirs) {
+  try {
+    if (fs.existsSync(dir)) {
+      fontsDirFound = dir;
+      process.env.FONTCONFIG_PATH = dir;
+      process.env.FONTCONFIG_FILE = path.join(dir, 'fonts.conf');
+      break;
+    }
+  } catch {}
+}
+
+let poppinsBoldBase64 = '';
+if (fontsDirFound) {
+  try {
+    const boldPath = path.join(fontsDirFound, 'Poppins-Bold.ttf');
+    if (fs.existsSync(boldPath)) {
+      poppinsBoldBase64 = fs.readFileSync(boldPath).toString('base64');
+    }
+  } catch (err) {
+    console.warn('Failed to read Poppins-Bold.ttf in watermark-remover:', err);
+  }
+}
 
 export type WatermarkMode = 'logo_stamp' | 'spot_healer' | 'off';
 
@@ -131,12 +163,21 @@ async function getCircularBadge(
   const svg = Buffer.from(`
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
       <defs>
+        ${poppinsBoldBase64 ? `
+        <style>
+          @font-face {
+            font-family: 'Poppins';
+            src: url(data:font/truetype;charset=utf-8;base64,${poppinsBoldBase64}) format('truetype');
+            font-weight: 900;
+          }
+        </style>
+        ` : ''}
         <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
           <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
         </filter>
       </defs>
       <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 2}" fill="${barColor}" stroke="#FFFFFF" stroke-width="3" filter="url(#shadow)"/>
-      <text x="50%" y="54%" font-family="Poppins, Arial, sans-serif" font-size="${Math.round(size * 0.46)}" font-weight="900" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${initial}</text>
+      <text x="50%" y="54%" font-family="Poppins, 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif" font-size="${Math.round(size * 0.46)}" font-weight="900" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${initial}</text>
     </svg>
   `);
 
