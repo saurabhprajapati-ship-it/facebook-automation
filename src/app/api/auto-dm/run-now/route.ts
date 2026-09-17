@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, saveDb, AutoDmLog } from '@/lib/db';
+import { getDbFromReq, saveDbAsync, extractDriveFromReq, AutoDmLog } from '@/lib/db';
 import {
   fetchInstagramRecentMedia,
   fetchMediaComments,
@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const db = getDb();
+    const driveCreds = extractDriveFromReq(req);
+    const db = await getDbFromReq(req);
     const rules = (db.autoDmRules || []).filter((r) => r.enabled);
 
     if (!rules.length) {
@@ -59,6 +60,15 @@ export async function POST(req: Request) {
         for (const comment of comments) {
           if (processedSet.has(comment.id)) {
             continue; // Already processed
+          }
+
+          // Skip comments made by the page owner itself
+          if (
+            account.username &&
+            comment.username &&
+            comment.username.toLowerCase().trim() === account.username.toLowerCase().trim()
+          ) {
+            continue;
           }
 
           // Keyword check
@@ -202,14 +212,30 @@ export async function POST(req: Request) {
       rule.processedCommentIds = Array.from(processedSet).slice(-1500);
     }
 
-    // Append logs
-    const existingLogs = db.autoDmLogs || [];
+    // Safely persist updated comment tracking & execution logs to Google Drive
+    const latestDb = await getDbFromReq(req);
+    const updatedRules = (latestDb.autoDmRules || []).map((r) => {
+      const match = rules.find((rule) => rule.id === r.id);
+      if (match) {
+        return {
+          ...r,
+          processedCommentIds: match.processedCommentIds,
+          stats: match.stats,
+        };
+      }
+      return r;
+    });
+
+    const existingLogs = latestDb.autoDmLogs || [];
     const combinedLogs = [...existingLogs, ...executionLogs].slice(-200); // Keep last 200 logs
 
-    saveDb({
-      autoDmRules: db.autoDmRules,
-      autoDmLogs: combinedLogs,
-    });
+    await saveDbAsync(
+      {
+        autoDmRules: updatedRules,
+        autoDmLogs: combinedLogs,
+      },
+      driveCreds
+    );
 
     return NextResponse.json({
       ok: true,

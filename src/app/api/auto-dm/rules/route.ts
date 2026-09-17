@@ -29,15 +29,24 @@ export async function GET(req: Request) {
       logs = [];
     }
 
-    return NextResponse.json({
-      rules,
-      logs: logs.slice(-50).reverse(), // Last 50 logs, newest first
-      stats: {
-        totalRules: rules.length,
-        activeRules: rules.filter((r) => r.enabled).length,
-        totalDmsSent: rules.reduce((acc, r) => acc + (r.stats?.totalSent || 0), 0),
+    return NextResponse.json(
+      {
+        rules,
+        logs: logs.slice(-50).reverse(), // Last 50 logs, newest first
+        stats: {
+          totalRules: rules.length,
+          activeRules: rules.filter((r) => r.enabled).length,
+          totalDmsSent: rules.reduce((acc, r) => acc + (r.stats?.totalSent || 0), 0),
+        },
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      }
+    );
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to fetch rules' }, { status: 500 });
   }

@@ -69,8 +69,11 @@ export default function InboxDashboardPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Load rules & logs
-      const res = await fetch('/api/auto-dm/rules');
+      // Load rules & logs with fresh cache-busting
+      const res = await fetch(`/api/auto-dm/rules?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       const data = await res.json();
       if (data.rules) setRules(data.rules);
       if (data.logs) setLogs(data.logs);
@@ -304,6 +307,9 @@ export default function InboxDashboardPage() {
       setPublicReply('');
       setButtons([]);
       setMatchAllComments(false);
+      setMediaFilter('all');
+      setSpecificMediaId('');
+      setActiveTab('rules');
       loadData();
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -987,6 +993,57 @@ export default function InboxDashboardPage() {
                     />
                     <span>Trigger on ANY comment (no specific keyword required)</span>
                   </label>
+                </div>
+
+                {/* Trigger Scope (All vs Specific Post) */}
+                <div className="space-y-1.5 p-3 bg-stone-50 border border-stone-200 rounded-2xl">
+                  <label className="block font-bold text-stone-700">
+                    Trigger Scope (Which Posts & Reels?)
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMediaFilter('all');
+                        setSpecificMediaId('');
+                      }}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold text-center transition-all ${
+                        mediaFilter === 'all'
+                          ? 'bg-amber-500 border-amber-500 text-white shadow-xs'
+                          : 'bg-white border-stone-300 text-stone-600 hover:bg-stone-100'
+                      }`}
+                    >
+                      🌐 All Posts & Reels
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMediaFilter('specific')}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold text-center transition-all ${
+                        mediaFilter === 'specific'
+                          ? 'bg-amber-500 border-amber-500 text-white shadow-xs'
+                          : 'bg-white border-stone-300 text-stone-600 hover:bg-stone-100'
+                      }`}
+                    >
+                      🎯 Specific Post Only
+                    </button>
+                  </div>
+                  {mediaFilter === 'specific' && (
+                    <div className="pt-1.5 flex items-center justify-between text-[11px] text-amber-900 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                      <span>
+                        Target Post ID: <strong className="font-mono">{specificMediaId || '(Selected from Posts tab)'}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMediaFilter('all');
+                          setSpecificMediaId('');
+                        }}
+                        className="text-amber-700 underline font-bold text-[10px]"
+                      >
+                        Switch to All Posts
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* DM Message & Variable Injection */}

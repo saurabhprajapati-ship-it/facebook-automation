@@ -387,8 +387,6 @@ export async function getDbFromReq(req?: Request): Promise<DatabaseSchema> {
   return ensureDb();
 }
 
-let isPushingToDrive = false;
-
 export async function syncDbFromDrive(
   explicitCreds?: { credentialsJson?: string; folderId?: string }
 ): Promise<DatabaseSchema> {
@@ -428,28 +426,43 @@ export async function syncDbFromDrive(
   return current;
 }
 
+let activePushPromise: Promise<{ ok: boolean; error?: string }> | null = null;
+
 export async function syncDbToDrive(
   data?: Partial<DatabaseSchema>,
   explicitCreds?: { credentialsJson?: string; folderId?: string }
 ): Promise<{ ok: boolean; error?: string }> {
-  if (isPushingToDrive) return { ok: false, error: 'Sync already in progress' };
-  isPushingToDrive = true;
-  try {
-    const current = ensureDb();
-    const toSave = data ? { ...current, ...data } : current;
-    const { credentialsJson, folderId } = getActiveDriveCredentials(toSave, explicitCreds);
+  // If a drive sync is already running, wait for it before starting the next sync
+  if (activePushPromise) {
+    try {
+      await activePushPromise;
+    } catch {}
+  }
 
-    if (!credentialsJson) {
-      return { ok: false, error: 'Google Drive credentials not configured' };
+  const pushAction = async (): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const current = ensureDb();
+      const toSave = data ? { ...current, ...data } : current;
+      const { credentialsJson, folderId } = getActiveDriveCredentials(toSave, explicitCreds);
+
+      if (!credentialsJson) {
+        return { ok: false, error: 'Google Drive credentials not configured' };
+      }
+
+      await saveFullDriveDatabase(credentialsJson, folderId, toSave);
+      return { ok: true };
+    } catch (err: any) {
+      console.warn('[DB] syncDbToDrive failed:', err);
+      return { ok: false, error: err.message || 'Push to Google Drive failed' };
     }
+  };
 
-    await saveFullDriveDatabase(credentialsJson, folderId, toSave);
-    return { ok: true };
-  } catch (err: any) {
-    console.warn('[DB] syncDbToDrive failed:', err);
-    return { ok: false, error: err.message || 'Push to Google Drive failed' };
+  try {
+    activePushPromise = pushAction();
+    const result = await activePushPromise;
+    return result;
   } finally {
-    isPushingToDrive = false;
+    activePushPromise = null;
   }
 }
 
@@ -465,7 +478,12 @@ export async function saveDbAsync(
   fs.writeFileSync(DB_FILE, JSON.stringify(updated, null, 2), 'utf-8');
 
   // Await Google Drive push so Vercel Serverless doesn't freeze prematurely!
-  await syncDbToDrive(updated, explicitCreds);
+  const pushRes = await syncDbToDrive(updated, explicitCreds);
+  if (!pushRes.ok) {
+    console.warn('[DB] saveDbAsync Google Drive sync retry:', pushRes.error);
+    await new Promise((r) => setTimeout(r, 400));
+    await syncDbToDrive(updated, explicitCreds);
+  }
 
   return updated;
 }
