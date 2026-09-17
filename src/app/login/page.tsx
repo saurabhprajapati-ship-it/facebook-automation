@@ -3,15 +3,13 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, User, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 
 export default function LoginPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -23,13 +21,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const endpoint = tab === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const body = tab === 'login' ? { email, password } : { name, email, password };
-
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
@@ -45,7 +40,7 @@ export default function LoginPage() {
         localStorage.setItem('postnova_token', data.token);
       }
 
-      setSuccessMsg(tab === 'login' ? 'Logged in successfully! Redirecting...' : 'Account created successfully! Redirecting...');
+      setSuccessMsg('Logged in successfully! Redirecting...');
 
       setTimeout(() => {
         window.location.href = '/';
@@ -168,38 +163,6 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-white dark:bg-stone-900 rounded-3xl border border-cream-200 dark:border-stone-800 shadow-xl p-6 sm:p-8 backdrop-blur-md">
-          {/* Tabs */}
-          <div className="grid grid-cols-2 gap-1 p-1 bg-cream-100 dark:bg-stone-800 rounded-2xl mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setTab('login');
-                setErrorMsg('');
-              }}
-              className={`py-2 text-xs font-bold rounded-xl transition ${
-                tab === 'login'
-                  ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-900'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTab('register');
-                setErrorMsg('');
-              }}
-              className={`py-2 text-xs font-bold rounded-xl transition ${
-                tab === 'register'
-                  ? 'bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs'
-                  : 'text-stone-500 dark:text-stone-400 hover:text-stone-900'
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
-
           {/* Alerts */}
           {errorMsg && (
             <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center gap-2">
@@ -215,27 +178,41 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {tab === 'register' && (
-              <div>
-                <label className="text-xs font-bold text-stone-700 dark:text-stone-300 block mb-1">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-stone-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    className="w-full text-xs font-medium pl-9 pr-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-white focus:bg-white dark:focus:bg-stone-800 focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-              </div>
-            )}
+          {/* Primary Action: Google Sign-In & Instant Registration */}
+          <div className="space-y-3 mb-6">
+            <button
+              type="button"
+              onClick={() => handleGoogleLogin()}
+              disabled={loading}
+              className="w-full py-3 px-4 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-100 font-bold text-sm rounded-2xl border-2 border-stone-200 dark:border-stone-700 shadow-sm transition flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z" />
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.16 0 9.98 0 12s.45 3.84 1.25 5.42l4.03-3.15z" />
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+            <p className="text-[11px] text-center text-stone-500 dark:text-stone-400">
+              ⚡ New accounts register automatically via Google in 1-click
+            </p>
+          </div>
 
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-cream-200 dark:border-stone-800" />
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase">
+              <span className="bg-white dark:bg-stone-900 px-3 text-stone-400 font-bold tracking-wider">
+                Or sign in with email
+              </span>
+            </div>
+          </div>
+
+          {/* Form for Existing Accounts / Admin */}
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-bold text-stone-700 dark:text-stone-300 block mb-1">
                 Email Address
@@ -268,9 +245,6 @@ export default function LoginPage() {
                   className="w-full text-xs font-medium pl-9 pr-3 py-2.5 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-white focus:bg-white dark:focus:bg-stone-800 focus:outline-none focus:border-amber-400"
                 />
               </div>
-              {tab === 'register' && (
-                <p className="text-[10px] text-stone-400 mt-1">Minimum 6 characters</p>
-              )}
             </div>
 
             <button
@@ -285,40 +259,12 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  <span>{tab === 'login' ? 'Sign In to Dashboard' : 'Create My Account'}</span>
+                  <span>Sign In to Dashboard</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
-
-          {/* Google Sign-in Divider */}
-          <div className="relative my-5">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-cream-200 dark:border-stone-800" />
-            </div>
-            <div className="relative flex justify-center text-[10px] uppercase">
-              <span className="bg-white dark:bg-stone-900 px-2 text-stone-400 font-bold tracking-wider">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          {/* Continue with Google Button */}
-          <button
-            type="button"
-            onClick={() => handleGoogleLogin()}
-            disabled={loading}
-            className="w-full py-2.5 px-4 bg-white dark:bg-stone-800 hover:bg-stone-50 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-100 font-bold text-xs rounded-xl border border-stone-200 dark:border-stone-700 shadow-xs transition flex items-center justify-center gap-2.5 active:scale-95 disabled:opacity-50 cursor-pointer"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z" />
-              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
-              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.16 0 9.98 0 12s.45 3.84 1.25 5.42l4.03-3.15z" />
-              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
-            </svg>
-            <span>Sign in with Google</span>
-          </button>
         </div>
       </div>
     </div>
