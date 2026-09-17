@@ -22,9 +22,12 @@ import {
   Check,
   X,
   FileText,
+  Edit3,
+  Link2,
+  UserCheck,
 } from 'lucide-react';
 import AccountSelector from '@/components/AccountSelector';
-import { Account, AutoDmRule, AutoDmLog } from '@/lib/db';
+import { Account, AutoDmRule, AutoDmLog, AutoDmButton } from '@/lib/db';
 
 export default function InboxDashboardPage() {
   const [activeTab, setActiveTab] = useState<'rules' | 'media' | 'logs' | 'story'>('rules');
@@ -40,14 +43,16 @@ export default function InboxDashboardPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // New Rule Form State
+  // Rule Form & Edit State
   const [showNewRuleModal, setShowNewRuleModal] = useState(false);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [ruleName, setRuleName] = useState('');
   const [targetAccountId, setTargetAccountId] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
   const [matchAllComments, setMatchAllComments] = useState(false);
   const [dmMessage, setDmMessage] = useState('');
   const [publicReply, setPublicReply] = useState('');
+  const [buttons, setButtons] = useState<AutoDmButton[]>([]);
   const [mediaFilter, setMediaFilter] = useState<'all' | 'specific'>('all');
   const [specificMediaId, setSpecificMediaId] = useState('');
 
@@ -193,7 +198,60 @@ export default function InboxDashboardPage() {
     }
   };
 
-  const handleCreateRule = async (e: React.FormEvent) => {
+  const openCreateRuleModal = () => {
+    setEditingRuleId(null);
+    setRuleName('');
+    setKeywordsInput('');
+    setDmMessage('');
+    setPublicReply('');
+    setButtons([]);
+    setMatchAllComments(false);
+    setMediaFilter('all');
+    setSpecificMediaId('');
+    if (igAccounts[0]?.id && !targetAccountId) {
+      setTargetAccountId(igAccounts[0].id);
+    }
+    setShowNewRuleModal(true);
+  };
+
+  const openEditRuleModal = (rule: AutoDmRule) => {
+    setEditingRuleId(rule.id);
+    setRuleName(rule.name || '');
+    setTargetAccountId(rule.targetAccountId || (igAccounts[0]?.id ?? ''));
+    setKeywordsInput(rule.triggerKeywords?.join(', ') || '');
+    setMatchAllComments(!rule.triggerKeywords || rule.triggerKeywords.length === 0);
+    setDmMessage(rule.dmMessage || '');
+    setPublicReply(rule.publicReplyMessage || '');
+    setButtons(rule.buttons ? [...rule.buttons] : []);
+    setMediaFilter(rule.mediaFilter || 'all');
+    setSpecificMediaId(rule.specificMediaId || '');
+    setShowNewRuleModal(true);
+  };
+
+  const handleAddButton = () => {
+    if (buttons.length >= 3) return;
+    setButtons([...buttons, { id: 'btn_' + Date.now(), title: '', url: '' }]);
+  };
+
+  const handleUpdateButton = (index: number, field: 'title' | 'url', value: string) => {
+    const next = [...buttons];
+    next[index] = { ...next[index], [field]: value };
+    setButtons(next);
+  };
+
+  const handleRemoveButton = (index: number) => {
+    setButtons(buttons.filter((_, i) => i !== index));
+  };
+
+  const insertVariable = (variable: string, target: 'dm' | 'reply') => {
+    if (target === 'dm') {
+      setDmMessage((prev) => prev + (prev.endsWith(' ') || prev.length === 0 ? '' : ' ') + variable + ' ');
+    } else {
+      setPublicReply((prev) => prev + (prev.endsWith(' ') || prev.length === 0 ? '' : ' ') + variable + ' ');
+    }
+  };
+
+  const handleSaveRule = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -206,10 +264,19 @@ export default function InboxDashboardPage() {
             .map((k) => k.trim())
             .filter(Boolean);
 
+      const validButtons = buttons
+        .filter((b) => b.title.trim() && b.url.trim())
+        .map((b) => ({
+          id: b.id || 'btn_' + Math.random().toString(36).substring(2, 8),
+          title: b.title.trim().slice(0, 20),
+          url: b.url.trim(),
+        }));
+
       const res = await fetch('/api/auto-dm/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editingRuleId || undefined,
           name: ruleName.trim() || (kwList.length ? `Auto-DM: ${kwList.join(', ')}` : 'Auto-DM All Comments'),
           targetAccountId: targetAccountId,
           triggerKeywords: kwList,
@@ -217,6 +284,7 @@ export default function InboxDashboardPage() {
           mediaFilter: mediaFilter,
           specificMediaId: mediaFilter === 'specific' ? specificMediaId : undefined,
           dmMessage: dmMessage,
+          buttons: validButtons,
           publicReplyMessage: publicReply,
           enabled: true,
         }),
@@ -224,15 +292,17 @@ export default function InboxDashboardPage() {
 
       const data = await res.json();
       if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to create rule');
+        throw new Error(data.error || 'Failed to save rule');
       }
 
-      setSuccessMsg('Trigger rule created successfully! ✨');
+      setSuccessMsg(editingRuleId ? 'Trigger rule updated successfully! ✨' : 'Trigger rule created successfully! ✨');
       setShowNewRuleModal(false);
+      setEditingRuleId(null);
       setRuleName('');
       setKeywordsInput('');
       setDmMessage('');
       setPublicReply('');
+      setButtons([]);
       setMatchAllComments(false);
       loadData();
     } catch (err: any) {
@@ -343,7 +413,7 @@ export default function InboxDashboardPage() {
           </button>
 
           <button
-            onClick={() => setShowNewRuleModal(true)}
+            onClick={openCreateRuleModal}
             className="px-4 py-2 rounded-2xl bg-stone-900 text-white text-xs font-black hover:bg-stone-800 transition-all flex items-center gap-2 shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -472,7 +542,7 @@ export default function InboxDashboardPage() {
                 </p>
               </div>
               <button
-                onClick={() => setShowNewRuleModal(true)}
+                onClick={openCreateRuleModal}
                 className="px-5 py-2.5 rounded-2xl bg-amber-500 text-white text-xs font-extrabold hover:bg-amber-600 transition-all inline-flex items-center gap-2 shadow-xs"
               >
                 <Plus className="w-4 h-4" />
@@ -505,6 +575,13 @@ export default function InboxDashboardPage() {
                       </div>
 
                       <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => openEditRuleModal(rule)}
+                          className="p-1.5 rounded-xl text-stone-400 hover:text-amber-600 hover:bg-amber-50 transition-all"
+                          title="Edit trigger rule & buttons"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => handleToggleRule(rule.id, rule.enabled)}
                           className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all ${
@@ -544,13 +621,38 @@ export default function InboxDashboardPage() {
                     </div>
 
                     {/* Message Preview */}
-                    <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200/60 text-xs space-y-1.5">
-                      <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider flex items-center gap-1">
-                        <Send className="w-3 h-3 text-amber-500" /> Private DM Sent:
+                    <div className="p-3 bg-stone-50 rounded-2xl border border-stone-200/60 text-xs space-y-2">
+                      <div>
+                        <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                          <Send className="w-3 h-3 text-amber-500" /> Private DM Sent:
+                        </div>
+                        <p className="text-stone-800 font-medium whitespace-pre-wrap line-clamp-3">
+                          {rule.dmMessage}
+                        </p>
                       </div>
-                      <p className="text-stone-800 font-medium whitespace-pre-wrap line-clamp-3">
-                        {rule.dmMessage}
-                      </p>
+
+                      {rule.buttons && rule.buttons.length > 0 && (
+                        <div className="pt-2 border-t border-stone-200/60 space-y-1.5">
+                          <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider flex items-center gap-1">
+                            <Link2 className="w-3 h-3 text-amber-500" /> Action Buttons ({rule.buttons.length}):
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {rule.buttons.map((btn) => (
+                              <a
+                                key={btn.id}
+                                href={btn.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50/80 hover:bg-amber-100 text-stone-800 text-[11px] font-bold border border-amber-200 transition-colors"
+                              >
+                                <span>{btn.title}</span>
+                                <ExternalLink className="w-3 h-3 text-amber-600" />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {rule.publicReplyMessage && (
                         <div className="pt-2 border-t border-stone-200/60 text-[11px] text-stone-600">
                           <span className="font-bold text-stone-500">Public Reply: </span>
@@ -646,9 +748,9 @@ export default function InboxDashboardPage() {
                     )}
                     <button
                       onClick={() => {
+                        openCreateRuleModal();
                         setMediaFilter('specific');
                         setSpecificMediaId(m.id);
-                        setShowNewRuleModal(true);
                       }}
                       className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-[11px] font-bold hover:bg-amber-600 transition-all flex items-center gap-1"
                     >
@@ -813,112 +915,337 @@ export default function InboxDashboardPage() {
         </div>
       )}
 
-      {/* NEW RULE MODAL */}
+      {/* NEW / EDIT RULE MODAL */}
       {showNewRuleModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 border border-cream-200 shadow-2xl space-y-5 animate-scaleUp">
-            <div className="flex items-center justify-between pb-3 border-b border-cream-100">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-5 sm:p-7 border border-cream-200 shadow-2xl space-y-5 animate-scaleUp my-auto max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-cream-100 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold">
+                <div className="w-9 h-9 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs">
                   <Zap className="w-4 h-4" />
                 </div>
-                <h3 className="font-extrabold text-stone-900 text-sm">Create Comment-to-DM Trigger</h3>
+                <div>
+                  <h3 className="font-extrabold text-stone-900 text-base">
+                    {editingRuleId ? 'Edit Auto-DM Trigger' : 'Create Auto-DM Trigger'}
+                  </h3>
+                  <p className="text-[11px] text-stone-400">
+                    Interactive Button Boxes, Personalized Tags & Auto-Reply
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setShowNewRuleModal(false)}
-                className="p-1 rounded-xl text-stone-400 hover:text-stone-700"
+                className="p-1.5 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-cream-100 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateRule} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-stone-700 mb-1">Trigger Name</label>
-                <input
-                  type="text"
-                  value={ruleName}
-                  onChange={(e) => setRuleName(e.target.value)}
-                  placeholder="e.g. Free E-book or Link Delivery"
-                  className="w-full px-3.5 py-2 rounded-xl border border-cream-300 text-xs focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1.5">Target Instagram Account</label>
-                <AccountSelector
-                  accounts={igAccounts}
-                  selectedId={targetAccountId}
-                  onSelect={setTargetAccountId}
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-stone-700 mb-1">
-                  Trigger Keywords (Comma separated)
-                </label>
-                <input
-                  type="text"
-                  disabled={matchAllComments}
-                  value={keywordsInput}
-                  onChange={(e) => setKeywordsInput(e.target.value)}
-                  placeholder="e.g. link, buy, price, info, guide"
-                  className="w-full px-3.5 py-2 rounded-xl border border-cream-300 text-xs font-mono focus:ring-2 focus:ring-amber-400 disabled:bg-stone-100"
-                />
-                <label className="flex items-center gap-2 mt-1.5 cursor-pointer text-stone-600 font-medium">
+            <form onSubmit={handleSaveRule} className="grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto pr-1">
+              {/* Left Column: Form Controls */}
+              <div className="lg:col-span-7 space-y-4 text-xs">
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">Trigger Name</label>
                   <input
-                    type="checkbox"
-                    checked={matchAllComments}
-                    onChange={(e) => setMatchAllComments(e.target.checked)}
-                    className="rounded text-amber-500 focus:ring-amber-400"
+                    type="text"
+                    value={ruleName}
+                    onChange={(e) => setRuleName(e.target.value)}
+                    placeholder="e.g. Free Course or Link Delivery"
+                    className="w-full px-3.5 py-2 rounded-xl border border-cream-300 text-xs focus:ring-2 focus:ring-amber-400"
                   />
-                  <span>Trigger on ANY comment (no keyword required)</span>
-                </label>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 dark:text-stone-300 mb-1.5">
+                    Target Instagram Account
+                  </label>
+                  <AccountSelector
+                    accounts={igAccounts}
+                    selectedId={targetAccountId}
+                    onSelect={setTargetAccountId}
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1">
+                    Trigger Keywords (Comma separated)
+                  </label>
+                  <input
+                    type="text"
+                    disabled={matchAllComments}
+                    value={keywordsInput}
+                    onChange={(e) => setKeywordsInput(e.target.value)}
+                    placeholder="e.g. link, buy, price, info, guide"
+                    className="w-full px-3.5 py-2 rounded-xl border border-cream-300 text-xs font-mono focus:ring-2 focus:ring-amber-400 disabled:bg-stone-100"
+                  />
+                  <label className="flex items-center gap-2 mt-1.5 cursor-pointer text-stone-600 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={matchAllComments}
+                      onChange={(e) => setMatchAllComments(e.target.checked)}
+                      className="rounded text-amber-500 focus:ring-amber-400"
+                    />
+                    <span>Trigger on ANY comment (no specific keyword required)</span>
+                  </label>
+                </div>
+
+                {/* DM Message & Variable Injection */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-stone-700">
+                      Direct Message (Sent to Inbox) 🚀
+                    </label>
+                    <span className="text-[11px] font-bold text-amber-600 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Meta Personalization Tags
+                    </span>
+                  </div>
+
+                  {/* 1-tap variable buttons */}
+                  <div className="flex flex-wrap items-center gap-1.5 p-2 bg-amber-50/70 border border-amber-200/80 rounded-xl">
+                    <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mr-1">Insert:</span>
+                    <button
+                      type="button"
+                      onClick={() => insertVariable('{{first_name}}', 'dm')}
+                      className="px-2 py-1 rounded-lg bg-white border border-amber-300 text-stone-800 text-[11px] font-bold hover:bg-amber-100 transition-colors shadow-2xs"
+                      title="Follower's first name (e.g. Rahul)"
+                    >
+                      + {'{{first_name}}'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertVariable('{{name}}', 'dm')}
+                      className="px-2 py-1 rounded-lg bg-white border border-amber-300 text-stone-800 text-[11px] font-bold hover:bg-amber-100 transition-colors shadow-2xs"
+                      title="Follower's full name (e.g. Rahul Sharma)"
+                    >
+                      + {'{{name}}'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => insertVariable('{{username}}', 'dm')}
+                      className="px-2 py-1 rounded-lg bg-white border border-amber-300 text-stone-800 text-[11px] font-bold hover:bg-amber-100 transition-colors shadow-2xs"
+                      title="Follower's Instagram handle (e.g. @rahul_dev)"
+                    >
+                      + {'{{username}}'}
+                    </button>
+                  </div>
+
+                  <textarea
+                    rows={3}
+                    value={dmMessage}
+                    onChange={(e) => setDmMessage(e.target.value)}
+                    placeholder="Hey {{first_name}}! Here is your requested access link. Tap the button below to open:"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-cream-300 text-xs focus:ring-2 focus:ring-amber-400 font-medium"
+                  />
+                  <p className="text-[10px] text-stone-400">
+                    Tags like <code className="bg-stone-100 px-1 py-0.5 rounded font-mono text-stone-700">{'{{first_name}}'}</code> automatically resolve to the commenter's real name.
+                  </p>
+                </div>
+
+                {/* Interactive Action Buttons Builder */}
+                <div className="space-y-2 p-3 bg-stone-50 rounded-2xl border border-stone-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block font-bold text-stone-800 text-xs flex items-center gap-1.5">
+                        <Link2 className="w-3.5 h-3.5 text-amber-600" />
+                        Interactive Action Buttons ({buttons.length}/3)
+                      </label>
+                      <p className="text-[10px] text-stone-500">
+                        Official Meta Button Template: sends links as tappable rounded boxes underneath the message.
+                      </p>
+                    </div>
+                    {buttons.length < 3 && (
+                      <button
+                        type="button"
+                        onClick={handleAddButton}
+                        className="px-2.5 py-1 rounded-xl bg-amber-500 text-white font-bold text-[11px] hover:bg-amber-600 transition-all flex items-center gap-1 shadow-2xs"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add Button Box
+                      </button>
+                    )}
+                  </div>
+
+                  {buttons.length === 0 ? (
+                    <div className="p-3 bg-white rounded-xl border border-dashed border-stone-300 text-center text-stone-500 text-[11px]">
+                      No button box added yet. Click <strong>"+ Add Button Box"</strong> to attach link cards (like Course Site, Free Class, Channels).
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {buttons.map((btn, idx) => (
+                        <div
+                          key={btn.id || idx}
+                          className="p-2.5 bg-white rounded-xl border border-stone-200 space-y-2 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              Button Box #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveButton(idx)}
+                              className="text-stone-400 hover:text-rose-600 transition-colors p-1"
+                              title="Remove button"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-stone-500 mb-0.5">
+                                Button Title (Max 20 chars)
+                              </label>
+                              <input
+                                type="text"
+                                maxLength={20}
+                                value={btn.title}
+                                onChange={(e) => handleUpdateButton(idx, 'title', e.target.value)}
+                                placeholder="e.g. Course Site / Our Channels"
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-cream-300 text-xs focus:ring-1 focus:ring-amber-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-stone-500 mb-0.5">
+                                Destination URL
+                              </label>
+                              <input
+                                type="url"
+                                value={btn.url}
+                                onChange={(e) => handleUpdateButton(idx, 'url', e.target.value)}
+                                placeholder="https://yoursite.com/class"
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-cream-300 text-xs font-mono focus:ring-1 focus:ring-amber-400"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Public Reply */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-stone-700">
+                      Public Comment Reply (Optional)
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-stone-400">Insert tag:</span>
+                      <button
+                        type="button"
+                        onClick={() => insertVariable('{{first_name}}', 'reply')}
+                        className="text-[10px] font-bold text-amber-700 hover:underline bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
+                      >
+                        + {'{{first_name}}'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertVariable('{{username}}', 'reply')}
+                        className="text-[10px] font-bold text-amber-700 hover:underline bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200"
+                      >
+                        + {'{{username}}'}
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={publicReply}
+                    onChange={(e) => setPublicReply(e.target.value)}
+                    placeholder="Check your DM {{first_name}}! Sent you the link 📥✨"
+                    className="w-full px-3.5 py-2 rounded-xl border border-cream-300 text-xs focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-stone-700 mb-1">
-                  Direct Message / Link (Sent to Inbox) 🚀
-                </label>
-                <textarea
-                  rows={3}
-                  value={dmMessage}
-                  onChange={(e) => setDmMessage(e.target.value)}
-                  placeholder="Hey {username}! Here is your exclusive link: https://yourwebsite.com/access 📥✨"
-                  required
-                  className="w-full px-3.5 py-2 rounded-xl border border-cream-300 text-xs focus:ring-2 focus:ring-amber-400 font-medium"
-                />
-                <span className="text-[10px] text-stone-400">
-                  Tip: Use <code className="bg-stone-100 px-1 py-0.5 rounded font-mono">{"{username}"}</code> to mention the follower's name!
-                </span>
+              {/* Right Column: Live Instagram DM Mockup Preview */}
+              <div className="lg:col-span-5 bg-stone-950 rounded-3xl p-4 sm:p-5 text-white flex flex-col justify-between border border-stone-800 shadow-xl min-h-[380px]">
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+                    <div className="flex items-center gap-2">
+                      <Instagram className="w-4 h-4 text-rose-400" />
+                      <span className="text-xs font-bold tracking-tight">Instagram Direct Preview</span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-stone-800 text-stone-400 font-mono">
+                      Live Mockup
+                    </span>
+                  </div>
+
+                  {/* Chat bubble */}
+                  <div className="space-y-2">
+                    <div className="flex items-end gap-2">
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                        IG
+                      </div>
+                      <div className="w-full bg-stone-900 text-stone-100 rounded-2xl rounded-bl-xs p-3.5 space-y-3 border border-stone-800 shadow-md">
+                        <p className="text-xs leading-relaxed whitespace-pre-wrap font-medium">
+                          {dmMessage
+                            ? dmMessage
+                                .replace(/\{\{first_name\}\}/gi, 'Rahul')
+                                .replace(/\{\{name\}\}/gi, 'Rahul Sharma')
+                                .replace(/\{\{username\}\}/gi, '@rahul_dev')
+                            : 'Hey Rahul! Here is your exclusive link. Tap the button below:'}
+                        </p>
+
+                        {/* Buttons inside bubble */}
+                        {buttons.filter((b) => b.title.trim()).length > 0 ? (
+                          <div className="space-y-1.5 pt-1 border-t border-stone-800/80">
+                            {buttons
+                              .filter((b) => b.title.trim())
+                              .map((btn, i) => (
+                                <div
+                                  key={i}
+                                  className="w-full py-2 px-3 rounded-xl bg-stone-800/90 hover:bg-stone-700 text-sky-400 font-bold text-xs text-center border border-stone-700/80 shadow-xs flex items-center justify-center gap-1.5 transition-all"
+                                >
+                                  <span>{btn.title}</span>
+                                  <ExternalLink className="w-3 h-3 text-sky-400/70" />
+                                </div>
+                              ))}
+                          </div>
+                        ) : (
+                          <div className="p-2.5 rounded-xl border border-dashed border-stone-800 bg-stone-950/40 text-center text-[10px] text-stone-400">
+                            + Add button boxes on the left to see action buttons here!
+                          </div>
+                        )}
+
+                        <div className="text-[9px] text-stone-400 flex items-center justify-end gap-1 pt-0.5">
+                          <span>Just now</span>
+                          <span>·</span>
+                          <span>Delivered</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {publicReply && (
+                      <div className="ml-9 p-2 rounded-xl bg-stone-900/60 border border-stone-800 text-[10px] text-stone-300">
+                        <span className="font-bold text-amber-400">Public Comment Reply: </span>
+                        "{publicReply.replace(/\{\{first_name\}\}/gi, 'Rahul').replace(/\{\{name\}\}/gi, 'Rahul Sharma').replace(/\{\{username\}\}/gi, '@rahul_dev')}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-3 mt-4 border-t border-stone-800 text-[10px] text-stone-400 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Official Meta Button Template with 1-click URL actions.</span>
+                </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-stone-700 mb-1">
-                  Public Comment Reply (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={publicReply}
-                  onChange={(e) => setPublicReply(e.target.value)}
-                  placeholder="Check your DM! Sent you the link 📥✨"
-                  className="w-full px-3.5 py-2 rounded-xl border border-cream-300 text-xs focus:ring-2 focus:ring-amber-400"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-cream-100">
+              {/* Action buttons footer spanning both columns */}
+              <div className="lg:col-span-12 flex items-center justify-end gap-2 pt-3 border-t border-cream-100">
                 <button
                   type="button"
                   onClick={() => setShowNewRuleModal(false)}
-                  className="px-4 py-2 rounded-xl border border-cream-300 text-stone-600 font-bold hover:bg-cream-100 transition-all"
+                  className="px-4 py-2 rounded-xl border border-cream-300 text-stone-600 font-bold hover:bg-cream-100 transition-all text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 text-white font-black hover:bg-amber-600 transition-all shadow-xs"
+                  className="px-6 py-2.5 rounded-xl bg-amber-500 text-white font-black hover:bg-amber-600 transition-all shadow-xs text-xs flex items-center gap-1.5"
                 >
-                  Save & Activate
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{editingRuleId ? 'Update Trigger Rule' : 'Save & Activate'}</span>
                 </button>
               </div>
             </form>

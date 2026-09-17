@@ -35,6 +35,7 @@ export interface InstagramComment {
   from?: {
     id: string;
     username: string;
+    name?: string;
   };
 }
 
@@ -234,26 +235,72 @@ export async function sendInstagramPrivateReply(
   pageId: string,
   commentId: string,
   messageText: string,
-  pageToken: string
+  pageToken: string,
+  buttons?: Array<{ title: string; url: string }>
 ): Promise<{ ok: boolean; messageId?: string; error?: string }> {
   try {
     const url = `${GRAPH_BASE}/${encodeURIComponent(pageId)}/messages`;
 
-    const res = await fetch(url, {
+    // Filter valid buttons (Meta supports up to 3 web_url buttons)
+    const validButtons = (buttons || [])
+      .filter((b) => b.title && b.title.trim() && b.url && b.url.trim())
+      .slice(0, 3)
+      .map((b) => ({
+        type: 'web_url',
+        url: b.url.trim(),
+        title: b.title.trim().slice(0, 20),
+      }));
+
+    let messageObj: any = { text: messageText };
+
+    if (validButtons.length > 0) {
+      // Use Meta official Button Template
+      messageObj = {
+        attachment: {
+          type: 'template',
+          payload: {
+            template_type: 'button',
+            text: messageText,
+            buttons: validButtons,
+          },
+        },
+      };
+    }
+
+    const payload = {
+      recipient: {
+        comment_id: commentId,
+      },
+      message: messageObj,
+      access_token: pageToken,
+    };
+
+    let res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recipient: {
-          comment_id: commentId,
-        },
-        message: {
-          text: messageText,
-        },
-        access_token: pageToken,
-      }),
+      body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
+    let data = await res.json();
+
+    // If template send fails (e.g. Meta policy quirk), gracefully fall back to text with links
+    if ((!res.ok || data.error) && validButtons.length > 0) {
+      console.warn('Button template failed, falling back to text DM:', data.error);
+      const fallbackText = `${messageText}\n\n${validButtons
+        .map((b) => `🔗 ${b.title}: ${b.url}`)
+        .join('\n')}`;
+      const fallbackPayload = {
+        recipient: { comment_id: commentId },
+        message: { text: fallbackText },
+        access_token: pageToken,
+      };
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fallbackPayload),
+      });
+      data = await res.json();
+    }
 
     if (!res.ok || data.error) {
       return { ok: false, error: explainInstagramError(data) };

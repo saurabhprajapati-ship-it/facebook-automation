@@ -1,7 +1,7 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Sparkles, Layers } from 'lucide-react';
+import { ChevronDown, Check, Sparkles, Layers, Search } from 'lucide-react';
 import { InstagramIcon, FacebookIcon } from './BrandIcons';
 
 export interface AccountOption {
@@ -28,6 +28,7 @@ export default function AccountSelector({
   className = '',
 }: AccountSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -41,8 +42,15 @@ export default function AccountSelector({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const igAccounts = accounts.filter((a) => a.platform === 'instagram');
-  const fbAccounts = accounts.filter((a) => a.platform === 'facebook');
+  const q = searchQuery.toLowerCase().trim();
+
+  const igAccounts = accounts
+    .filter((a) => a.platform === 'instagram')
+    .filter((a) => !q || a.name.toLowerCase().includes(q) || (a.username && a.username.toLowerCase().includes(q)));
+
+  const fbAccounts = accounts
+    .filter((a) => a.platform === 'facebook')
+    .filter((a) => !q || a.name.toLowerCase().includes(q));
 
   // Selected account
   const selectedAccount =
@@ -130,143 +138,165 @@ export default function AccountSelector({
       {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute left-0 right-0 top-full mt-2 z-50 rounded-2xl bg-white dark:bg-stone-900 border border-cream-200 dark:border-stone-700 shadow-xl overflow-hidden p-1.5 space-y-1 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
-          {/* Instagram Section */}
-          {igAccounts.length > 0 && (
-            <div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-pink-600 dark:text-pink-400">
-                <InstagramIcon className="w-3 h-3" />
-                <span>Instagram Accounts</span>
+          {/* Quick Search for 20+ Accounts */}
+          {accounts.length > 4 && (
+            <div className="p-1 border-b border-cream-200/80 dark:border-stone-800">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Search 20+ accounts..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full pl-7 pr-3 py-1.5 rounded-xl border border-cream-200 dark:border-stone-700 text-xs bg-stone-50/70 dark:bg-stone-800/80 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                />
               </div>
-              {igAccounts.map((acc) => {
-                const isSelected = selectedId === acc.id;
-                return (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    onClick={() => {
-                      onSelect(acc.id);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl transition-all ${
-                      isSelected
-                        ? 'bg-amber-100/70 dark:bg-amber-500/20 text-stone-900 dark:text-white font-bold'
-                        : 'hover:bg-cream-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="relative shrink-0">
-                        {acc.profilePictureUrl ? (
-                          <img
-                            src={acc.profilePictureUrl}
-                            alt={acc.name}
-                            className="w-8 h-8 rounded-full object-cover border border-amber-300 shadow-2xs"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-pink-100 dark:bg-pink-950/50 text-pink-700 dark:text-pink-300 font-bold text-xs flex items-center justify-center">
-                            {acc.name.charAt(0)}
-                          </div>
-                        )}
-                        <InstagramIcon className="w-3 h-3 absolute -bottom-0.5 -right-0.5" />
-                      </div>
-                      <div className="text-left min-w-0">
-                        <p className="text-xs font-bold truncate">{acc.name}</p>
-                        <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
-                          @{acc.username || acc.name}
-                        </p>
-                      </div>
-                    </div>
-                    {isSelected && <Check className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
-                  </button>
-                );
-              })}
             </div>
           )}
 
-          {/* Facebook Section */}
-          {fbAccounts.length > 0 && (
-            <div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 mt-1">
-                <FacebookIcon className="w-3 h-3" />
-                <span>Facebook Pages</span>
-              </div>
-              {fbAccounts.map((acc) => {
-                const isSelected = selectedId === acc.id;
-                return (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    onClick={() => {
-                      onSelect(acc.id);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl transition-all ${
-                      isSelected
-                        ? 'bg-amber-100/70 dark:bg-amber-500/20 text-stone-900 dark:text-white font-bold'
-                        : 'hover:bg-cream-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="relative shrink-0">
-                        {acc.profilePictureUrl ? (
-                          <img
-                            src={acc.profilePictureUrl}
-                            alt={acc.name}
-                            className="w-8 h-8 rounded-full object-cover border border-blue-300 shadow-2xs"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center">
-                            {acc.name.charAt(0)}
-                          </div>
-                        )}
-                        <FacebookIcon className="w-3 h-3 absolute -bottom-0.5 -right-0.5" />
-                      </div>
-                      <div className="text-left min-w-0">
-                        <p className="text-xs font-bold truncate">{acc.name}</p>
-                        <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
-                          Facebook Page
-                        </p>
-                      </div>
+          <div className="max-h-64 overflow-y-auto space-y-1 pr-0.5">
+            {/* Cross-Platform "Both" Option */}
+            {!searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect('both');
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-2 rounded-xl transition-all ${
+                  selectedId === 'both'
+                    ? 'bg-amber-100/70 dark:bg-amber-500/20 text-stone-900 dark:text-white font-bold'
+                    : 'hover:bg-cream-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex -space-x-1.5 shrink-0">
+                    <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] shadow-2xs">
+                      f
                     </div>
-                    {isSelected && <Check className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                    <div className="w-6 h-6 rounded-full bg-linear-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center font-bold text-[10px] shadow-2xs">
+                      IG
+                    </div>
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="text-xs font-bold truncate">Both Facebook & Instagram</p>
+                    <p className="text-[10px] text-stone-400 truncate">Post to both networks simultaneously</p>
+                  </div>
+                </div>
+                {selectedId === 'both' && <Check className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+              </button>
+            )}
 
-          {/* Both Facebook & Instagram Option */}
-          <div className="border-t border-cream-200 dark:border-stone-700 pt-1 mt-1">
-            <button
-              type="button"
-              onClick={() => {
-                onSelect('both');
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center justify-between p-2 rounded-xl transition-all ${
-                selectedId === 'both'
-                  ? 'bg-amber-100/80 dark:bg-amber-500/20 text-stone-900 dark:text-white font-bold'
-                  : 'hover:bg-cream-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex -space-x-1.5 shrink-0">
-                  <FacebookIcon className="w-6 h-6 border-2 border-white dark:border-stone-800 rounded-full" />
-                  <InstagramIcon className="w-6 h-6 border-2 border-white dark:border-stone-800 rounded-full" />
+            {/* Instagram Section */}
+            {igAccounts.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-pink-600 dark:text-pink-400">
+                  <InstagramIcon className="w-3 h-3" />
+                  <span>Instagram Accounts ({igAccounts.length})</span>
                 </div>
-                <div className="text-left min-w-0">
-                  <p className="text-xs font-extrabold flex items-center gap-1">
-                    Both Facebook & Instagram
-                    <Sparkles className="w-3 h-3 text-amber-500" />
-                  </p>
-                  <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
-                    Ek sath dono platforms par publish hoga
-                  </p>
-                </div>
+                {igAccounts.map((acc) => {
+                  const isSelected = selectedId === acc.id;
+                  return (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => {
+                        onSelect(acc.id);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl transition-all ${
+                        isSelected
+                          ? 'bg-amber-100/70 dark:bg-amber-500/20 text-stone-900 dark:text-white font-bold'
+                          : 'hover:bg-cream-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative shrink-0">
+                          {acc.profilePictureUrl ? (
+                            <img
+                              src={acc.profilePictureUrl}
+                              alt={acc.name}
+                              className="w-8 h-8 rounded-full object-cover border border-amber-300 shadow-2xs"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-pink-100 dark:bg-pink-950/50 text-pink-700 dark:text-pink-300 font-bold text-xs flex items-center justify-center">
+                              {acc.name.charAt(0)}
+                            </div>
+                          )}
+                          <InstagramIcon className="w-3 h-3 absolute -bottom-0.5 -right-0.5" />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <p className="text-xs font-bold truncate">{acc.name}</p>
+                          <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                            @{acc.username || acc.name}
+                          </p>
+                        </div>
+                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+                    </button>
+                  );
+                })}
               </div>
-              {selectedId === 'both' && (
-                <Check className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              )}
-            </button>
+            )}
+
+            {/* Facebook Section */}
+            {fbAccounts.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 mt-1">
+                  <FacebookIcon className="w-3 h-3" />
+                  <span>Facebook Pages ({fbAccounts.length})</span>
+                </div>
+                {fbAccounts.map((acc) => {
+                  const isSelected = selectedId === acc.id;
+                  return (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => {
+                        onSelect(acc.id);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl transition-all ${
+                        isSelected
+                          ? 'bg-amber-100/70 dark:bg-amber-500/20 text-stone-900 dark:text-white font-bold'
+                          : 'hover:bg-cream-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative shrink-0">
+                          {acc.profilePictureUrl ? (
+                            <img
+                              src={acc.profilePictureUrl}
+                              alt={acc.name}
+                              className="w-8 h-8 rounded-full object-cover border border-blue-300 shadow-2xs"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-bold text-xs flex items-center justify-center">
+                              f
+                            </div>
+                          )}
+                          <FacebookIcon className="w-3 h-3 absolute -bottom-0.5 -right-0.5" />
+                        </div>
+                        <div className="text-left min-w-0">
+                          <p className="text-xs font-bold truncate">{acc.name}</p>
+                          <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                            ID: {acc.id.replace('acc_', '')}
+                          </p>
+                        </div>
+                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {igAccounts.length === 0 && fbAccounts.length === 0 && (
+              <div className="py-4 text-center text-xs text-stone-400">
+                No accounts match &quot;{searchQuery}&quot;
+              </div>
+            )}
           </div>
         </div>
       )}

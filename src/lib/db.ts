@@ -141,6 +141,12 @@ export interface ScheduledPostItem {
   postedAt?: string;
 }
 
+export interface AutoDmButton {
+  id: string;
+  title: string;
+  url: string;
+}
+
 export interface AutoDmRule {
   id: string;
   userId?: string;
@@ -154,6 +160,7 @@ export interface AutoDmRule {
   triggerKeywords: string[]; // lowercase keywords e.g. ["link", "price", "info"]
   matchType: 'contains' | 'exact' | 'any';
   dmMessage: string;
+  buttons?: AutoDmButton[]; // Interactive Action Buttons (URL Cards)
   publicReplyMessage?: string;
   processedCommentIds: string[];
   stats: {

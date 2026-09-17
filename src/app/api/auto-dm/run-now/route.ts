@@ -93,14 +93,28 @@ export async function POST(req: Request) {
             // Anti-ban human jitter (3000ms delay)
             await new Promise((r) => setTimeout(r, 3000));
 
-            // Personalize message if {username} is in template
-            const personalizedMessage = rule.dmMessage.replace(
-              /\{username\}/gi,
-              `@${comment.username || 'friend'}`
-            );
+            // Meta Personalized Placeholders (name, first_name, username)
+            const rawName = comment.from?.name || comment.username || 'friend';
+            const firstName = comment.from?.name ? comment.from.name.split(' ')[0] : (comment.username || 'friend');
+            const userHandle = `@${comment.username || 'friend'}`;
 
-            // 1. Send Private Reply DM
-            const dmRes = await sendInstagramPrivateReply(pageId, comment.id, personalizedMessage, token);
+            const formatPersonalizedText = (template: string) => {
+              return template
+                .replace(/(\{\{first_name\}\}|\{first_name\})/gi, firstName)
+                .replace(/(\{\{name\}\}|\{name\}|\{\{full_name\}\}|\{full_name\})/gi, rawName)
+                .replace(/(\{\{username\}\}|\{username\})/gi, userHandle);
+            };
+
+            const personalizedMessage = formatPersonalizedText(rule.dmMessage);
+
+            // 1. Send Private Reply DM with Meta Button Template
+            const dmRes = await sendInstagramPrivateReply(
+              pageId,
+              comment.id,
+              personalizedMessage,
+              token,
+              rule.buttons
+            );
 
             let replyStatus: 'sent' | 'failed' | 'skipped' = 'skipped';
 
@@ -112,10 +126,7 @@ export async function POST(req: Request) {
 
               // 2. Send Public Reply if configured
               if (rule.publicReplyMessage && rule.publicReplyMessage.trim()) {
-                const publicReplyText = rule.publicReplyMessage.replace(
-                  /\{username\}/gi,
-                  `@${comment.username || 'friend'}`
-                );
+                const publicReplyText = formatPersonalizedText(rule.publicReplyMessage);
                 const pubRes = await sendInstagramPublicReply(comment.id, publicReplyText, token);
                 replyStatus = pubRes.ok ? 'sent' : 'failed';
               }

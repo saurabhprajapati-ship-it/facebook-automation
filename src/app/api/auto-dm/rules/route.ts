@@ -58,6 +58,7 @@ export async function POST(req: Request) {
       triggerKeywords = [],
       matchType = 'contains',
       dmMessage,
+      buttons,
       publicReplyMessage,
     } = body;
 
@@ -77,6 +78,18 @@ export async function POST(req: Request) {
     const keywords = (Array.isArray(triggerKeywords) ? triggerKeywords : [triggerKeywords])
       .map((k: string) => String(k).trim().toLowerCase())
       .filter(Boolean);
+
+    // Normalize up to 3 interactive action buttons
+    const cleanButtons = Array.isArray(buttons)
+      ? buttons
+          .filter((b: any) => b && b.title && b.title.trim() && b.url && b.url.trim())
+          .slice(0, 3)
+          .map((b: any, i: number) => ({
+            id: b.id || 'btn_' + i + '_' + Date.now(),
+            title: String(b.title).trim().slice(0, 20),
+            url: String(b.url).trim(),
+          }))
+      : undefined;
 
     const rules = db.autoDmRules || [];
     const ruleId = id || 'rule_' + Date.now();
@@ -98,6 +111,7 @@ export async function POST(req: Request) {
       triggerKeywords: keywords,
       matchType: matchType,
       dmMessage: dmMessage.trim(),
+      buttons: cleanButtons,
       publicReplyMessage: publicReplyMessage?.trim() || undefined,
       processedCommentIds: existingIndex >= 0 ? rules[existingIndex].processedCommentIds || [] : [],
       stats: existingIndex >= 0 ? rules[existingIndex].stats || { totalSent: 0 } : { totalSent: 0 },

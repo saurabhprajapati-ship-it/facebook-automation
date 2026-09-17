@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -15,6 +15,7 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  Search,
 } from 'lucide-react';
 import { Account } from '@/lib/db';
 import { fetchWithDrive } from '@/lib/client-drive';
@@ -25,9 +26,11 @@ export default function InstagramAccountsPage() {
   const [fbAccounts, setFbAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [bulkConnecting, setBulkConnecting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [discovered, setDiscovered] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Manual Form state
   const [showManual, setShowManual] = useState(false);
@@ -88,6 +91,32 @@ export default function InstagramAccountsPage() {
     }
   };
 
+  const handleBulkConnectAll = async () => {
+    setBulkConnecting(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await fetchWithDrive('/api/accounts/instagram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bulkConnectAllFromFacebook: true }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Bulk Instagram connect failed');
+      }
+
+      setSuccessMsg(data.message || `Successfully linked all Instagram accounts from your Facebook Pages! 🚀`);
+      loadAccounts();
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setBulkConnecting(false);
+    }
+  };
+
   const handleManualConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -132,6 +161,15 @@ export default function InstagramAccountsPage() {
     }
   };
 
+  const filteredAccounts = igAccounts.filter((a) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (a.name && a.name.toLowerCase().includes(q)) ||
+      (a.username && a.username.toLowerCase().includes(q)) ||
+      (a.igUserId && a.igUserId.includes(q))
+    );
+  });
 
   return (
     <div className="space-y-6 max-w-5xl animate-fadeIn">
@@ -142,19 +180,19 @@ export default function InstagramAccountsPage() {
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-all"
         >
           <FacebookIcon className="w-4 h-4" />
-          Facebook Pages
+          Facebook Pages ({fbAccounts.length})
         </Link>
         <Link
           href="/accounts/instagram"
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-stone-700 text-stone-900 dark:text-white shadow-xs border border-stone-200/70 dark:border-stone-600"
         >
           <InstagramIcon className="w-4 h-4" />
-          Instagram Accounts
+          Instagram Accounts ({igAccounts.length})
         </Link>
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center p-2.5 shadow-md shrink-0">
             <InstagramIcon className="w-full h-full text-white" />
@@ -162,19 +200,40 @@ export default function InstagramAccountsPage() {
           <div>
             <h1 className="text-2xl font-black text-stone-900 dark:text-white tracking-tight">Instagram Business</h1>
             <p className="text-stone-500 dark:text-stone-400 font-medium text-xs">
-              Automate Comment-to-DM link delivery, public replies, and stories with 0% ban risk.
+              Automate Comment-to-DM button links, personalized names, and reels for 20+ accounts.
             </p>
           </div>
         </div>
 
-        <button
-          onClick={loadAccounts}
-          disabled={loading || scanning}
-          className="p-2.5 rounded-xl border border-cream-300 text-stone-600 hover:text-stone-900 hover:bg-cream-100 transition-all text-xs font-semibold flex items-center gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2.5">
+          {fbAccounts.length > 0 && (
+            <button
+              onClick={handleBulkConnectAll}
+              disabled={bulkConnecting || loading}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-purple-600 text-white font-extrabold text-xs shadow-soft hover:opacity-95 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {bulkConnecting ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Scanning & Linking All...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  <span>⚡ Bulk Connect from All {fbAccounts.length} FB Pages</span>
+                </>
+              )}
+            </button>
+          )}
+
+          <button
+            onClick={loadAccounts}
+            disabled={loading || scanning}
+            className="p-2.5 rounded-2xl border border-cream-300 text-stone-600 hover:text-stone-900 hover:bg-cream-100 transition-all text-xs font-semibold flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {successMsg && (
@@ -196,57 +255,78 @@ export default function InstagramAccountsPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Connected Instagram Accounts List */}
           <div className="bg-white rounded-3xl p-6 border border-cream-200/80 shadow-soft space-y-4">
-            <h2 className="text-sm font-extrabold text-stone-900 flex items-center gap-2">
-              <Layers className="w-4 h-4 text-rose-500" />
-              Connected Instagram Accounts ({igAccounts.length})
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-extrabold text-stone-900 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-rose-500" />
+                Connected Instagram Accounts
+              </h2>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-50 text-rose-800 border border-rose-200">
+                {igAccounts.length} Total
+              </span>
+            </div>
 
-            {igAccounts.length === 0 ? (
+            {/* Search filter for 20+ accounts */}
+            {igAccounts.length > 2 && (
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-stone-400" />
+                <input
+                  type="text"
+                  placeholder="Search Instagram accounts by username or name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 rounded-xl border border-cream-200 dark:border-stone-700 text-xs bg-stone-50/60 focus:outline-none focus:ring-1 focus:ring-rose-400"
+                />
+              </div>
+            )}
+
+            {filteredAccounts.length === 0 ? (
               <div className="p-8 border-2 border-dashed border-cream-200 rounded-2xl text-center space-y-3">
                 <div className="w-12 h-12 mx-auto rounded-full bg-rose-50 text-rose-500 flex items-center justify-center">
                   <Instagram className="w-6 h-6" />
                 </div>
-                <h3 className="font-bold text-stone-800 text-sm">No Instagram Account Connected Yet</h3>
+                <h3 className="font-bold text-stone-800 text-sm">
+                  {igAccounts.length === 0 ? 'No Instagram Account Connected Yet' : 'No accounts match your search.'}
+                </h3>
                 <p className="text-stone-500 text-xs max-w-sm mx-auto">
                   Click the 1-Click Auto-Connect button below to pull your Instagram account from your linked Facebook Page!
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {igAccounts.map((acc) => (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                {filteredAccounts.map((acc) => (
                   <div
                     key={acc.id}
                     className="p-4 rounded-2xl border border-stone-200/70 bg-gradient-to-r from-cream-50/50 to-white flex items-center justify-between shadow-xs"
                   >
-                    <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-3.5 min-w-0">
                       {acc.profilePictureUrl ? (
                         <img
                           src={acc.profilePictureUrl}
                           alt={acc.name}
-                          className="w-12 h-12 rounded-full object-cover ring-2 ring-rose-400/50"
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-rose-400/50 shrink-0"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center font-bold text-lg">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-white flex items-center justify-center font-bold text-lg shrink-0">
                           @
                         </div>
                       )}
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-stone-900 text-sm">
+                          <span className="font-extrabold text-stone-900 text-sm truncate">
                             {acc.username ? `@${acc.username}` : acc.name}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700 border border-emerald-300">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-700 border border-emerald-300 shrink-0">
                             Active ✅
                           </span>
                         </div>
-                        <p className="text-stone-500 text-xs mt-0.5">
+                        <p className="text-stone-500 text-xs mt-0.5 truncate">
                           {acc.followersCount ? `${acc.followersCount.toLocaleString()} Followers • ` : ''}
                           ID: <span className="font-mono text-[11px]">{acc.igUserId || acc.pageId}</span>
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <Link
                         href="/inbox"
                         className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-all flex items-center gap-1.5 shadow-xs"
@@ -256,7 +336,7 @@ export default function InstagramAccountsPage() {
                       </Link>
                       <button
                         onClick={() => handleDelete(acc.id)}
-                        className="p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-all"
+                        className="p-2 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
                         title="Disconnect"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -274,10 +354,10 @@ export default function InstagramAccountsPage() {
               <div>
                 <h2 className="text-sm font-black text-stone-900 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-600" />
-                  1-Click Auto-Connect from Facebook
+                  Auto-Connect from Facebook Pages
                 </h2>
                 <p className="text-stone-600 text-xs mt-0.5">
-                  Connect your Instagram account instantly using your already linked Facebook Page.
+                  Connect your Instagram accounts instantly using your connected Facebook Pages.
                 </p>
               </div>
               <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-white/80 border border-rose-200 text-rose-700">
@@ -289,26 +369,26 @@ export default function InstagramAccountsPage() {
               <div className="p-4 bg-white/80 rounded-2xl border border-rose-200 text-xs text-stone-700 space-y-2">
                 <p className="font-bold text-stone-800">No Facebook Pages connected yet.</p>
                 <p>
-                  Connect your Facebook Page first in{' '}
+                  Connect your Facebook Pages first in{' '}
                   <Link href="/accounts/facebook" className="text-blue-600 underline font-semibold">
                     Facebook Accounts
                   </Link>
-                  . Once connected, your linked Instagram account can be pulled in 1 click!
+                  . Once connected, your linked Instagram accounts can be pulled in 1 click!
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                 {fbAccounts.map((fb) => (
                   <div
                     key={fb.id}
                     className="p-4 bg-white rounded-2xl border border-cream-200 flex items-center justify-between shadow-xs"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-black">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-black shrink-0">
                         f
                       </div>
-                      <div>
-                        <h4 className="font-bold text-stone-900 text-xs">{fb.name}</h4>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-stone-900 text-xs truncate">{fb.name}</h4>
                         <p className="text-stone-400 text-[11px] font-mono">Page ID: {fb.pageId}</p>
                       </div>
                     </div>
@@ -316,17 +396,17 @@ export default function InstagramAccountsPage() {
                     <button
                       onClick={() => handleAutoConnect(fb.pageId)}
                       disabled={scanning}
-                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 text-white text-xs font-extrabold hover:opacity-95 transition-all flex items-center gap-2 shadow-xs disabled:opacity-50"
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 text-white text-xs font-extrabold hover:opacity-95 transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 shrink-0 cursor-pointer"
                     >
                       {scanning ? (
                         <>
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          Scanning Meta...
+                          Scanning...
                         </>
                       ) : (
                         <>
                           <Instagram className="w-3.5 h-3.5" />
-                          Scan & Link Instagram
+                          Link Instagram
                         </>
                       )}
                     </button>
@@ -340,7 +420,7 @@ export default function InstagramAccountsPage() {
           <div className="bg-white rounded-3xl p-6 border border-cream-200/80 shadow-soft space-y-4">
             <button
               onClick={() => setShowManual(!showManual)}
-              className="w-full flex items-center justify-between text-left"
+              className="w-full flex items-center justify-between text-left cursor-pointer"
             >
               <div>
                 <h3 className="text-xs font-black text-stone-800 uppercase tracking-wider">
@@ -386,7 +466,7 @@ export default function InstagramAccountsPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-5 py-2.5 rounded-xl bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 transition-all disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {loading ? 'Verifying...' : 'Connect Manually'}
                 </button>
@@ -409,7 +489,8 @@ export default function InstagramAccountsPage() {
             <ul className="text-[11px] text-emerald-800 space-y-1.5 font-medium">
               <li>✓ Zero risk of Instagram shadowban</li>
               <li>✓ Meta certified comment-to-DM flow</li>
-              <li>✓ Built-in human jitter delay (5-10s)</li>
+              <li>✓ Interactive button template cards</li>
+              <li>✓ Built-in anti-ban delay</li>
             </ul>
           </div>
 
@@ -439,7 +520,7 @@ export default function InstagramAccountsPage() {
                 <div>
                   <h4 className="font-bold text-stone-800">Link to Facebook Page</h4>
                   <p className="text-stone-500 text-[11px] mt-0.5">
-                    In Instagram App ➔ Edit Profile ➔ Page ➔ Select your Facebook Page ("Money Mind set").
+                    In Instagram App ➔ Edit Profile ➔ Page ➔ Select your Facebook Page.
                   </p>
                 </div>
               </div>
@@ -449,9 +530,9 @@ export default function InstagramAccountsPage() {
                   3
                 </span>
                 <div>
-                  <h4 className="font-bold text-stone-800">Click Auto-Connect</h4>
+                  <h4 className="font-bold text-stone-800">Bulk Connect</h4>
                   <p className="text-stone-500 text-[11px] mt-0.5">
-                    Click "Scan & Link Instagram" button on this page. PostNova handles everything!
+                    Click "Bulk Connect" above to pull all your Instagram accounts across all 20+ Facebook Pages at once!
                   </p>
                 </div>
               </div>

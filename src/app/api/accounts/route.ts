@@ -46,13 +46,55 @@ export async function POST(req: Request) {
   try {
     const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
-    const { pageId, systemUserToken, pageAccessToken, name } = body;
+    const { pageId, systemUserToken, pageAccessToken, name, scanOnly, bulkPages } = body;
+
+    const user = await getUserFromReq(req);
+    const activeUserId = user ? user.id : 'usr_admin_saurabh';
+
+    // 1. Scan Only Request: Returns all 20+ pages associated with System User token
+    if (scanOnly && systemUserToken) {
+      const pages = await fetchAccountsFromSystemUser(systemUserToken);
+      return NextResponse.json({ ok: true, pages });
+    }
+
+    const db = await getDbFromReq(req);
+
+    // 2. Bulk Import Request: Imports multiple selected pages at once
+    if (bulkPages && Array.isArray(bulkPages) && bulkPages.length > 0) {
+      let importedCount = 0;
+      for (const page of bulkPages) {
+        if (!page.id || !page.access_token) continue;
+        const pic = page.profile_picture_url || `https://graph.facebook.com/${page.id}/picture?type=large`;
+        const existingIndex = db.accounts.findIndex((a) => a.pageId === page.id);
+        const accRecord: Account = {
+          id: existingIndex >= 0 ? db.accounts[existingIndex].id : 'acc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+          userId: activeUserId,
+          platform: 'facebook',
+          pageId: page.id,
+          name: page.name || 'Facebook Page',
+          profilePictureUrl: pic,
+          systemUserToken: systemUserToken || page.systemUserToken,
+          pageAccessToken: page.access_token,
+          active: true,
+          addedAt: new Date().toISOString(),
+        };
+
+        if (existingIndex >= 0) {
+          db.accounts[existingIndex] = accRecord;
+        } else {
+          db.accounts.push(accRecord);
+        }
+        importedCount++;
+      }
+
+      await saveDbAsync({ accounts: db.accounts }, driveCreds);
+      return NextResponse.json({ ok: true, count: importedCount, message: `Successfully connected ${importedCount} pages!` });
+    }
 
     if (!pageId && !systemUserToken) {
       return NextResponse.json({ error: 'Page ID or System User Token is required.' }, { status: 400 });
     }
 
-    const db = await getDbFromReq(req);
     let tokenToUse = pageAccessToken;
     let finalPageId = pageId;
     let pageName = name || 'Facebook Page';
@@ -101,9 +143,6 @@ export async function POST(req: Request) {
     }
 
     // Check if account already exists
-    const user = await getUserFromReq(req);
-    const activeUserId = user ? user.id : 'usr_admin_saurabh';
-
     const existingIndex = db.accounts.findIndex((a) => a.pageId === finalPageId);
     const newAccount: Account = {
       id: existingIndex >= 0 ? db.accounts[existingIndex].id : 'acc_' + Date.now(),

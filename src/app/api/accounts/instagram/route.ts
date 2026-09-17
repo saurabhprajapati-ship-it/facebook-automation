@@ -57,8 +57,60 @@ export async function POST(req: Request) {
   try {
     const driveCreds = extractDriveFromReq(req);
     const body = await req.json();
-    const { autoConnectFromPageId, igUserId, pageAccessToken, name } = body;
+    const { autoConnectFromPageId, igUserId, pageAccessToken, name, bulkConnectAllFromFacebook } = body;
     const db = await getDbFromReq(req);
+    const user = await getUserFromReq(req);
+    const activeUserId = user ? user.id : 'usr_admin_saurabh';
+
+    // Bulk Connect all Instagram accounts linked to connected Facebook Pages
+    if (bulkConnectAllFromFacebook) {
+      const fbPages = (db.accounts || []).filter(
+        (a) => a.platform === 'facebook' && a.pageAccessToken && a.pageId && (!user || a.userId === activeUserId || a.userId === 'usr_admin_saurabh')
+      );
+
+      let connectedCount = 0;
+      for (const fb of fbPages) {
+        try {
+          const discovered = await getConnectedInstagramAccount(fb.pageId, fb.pageAccessToken);
+          if (discovered && discovered.id) {
+            const existingIdx = db.accounts.findIndex(
+              (a) => a.platform === 'instagram' && (a.igUserId === discovered.id || a.pageId === fb.pageId)
+            );
+            const igRecord: Account = {
+              id: existingIdx >= 0 ? db.accounts[existingIdx].id : 'acc_ig_' + discovered.id,
+              userId: activeUserId,
+              platform: 'instagram',
+              pageId: fb.pageId,
+              igUserId: discovered.id,
+              name: discovered.name || `@${discovered.username}`,
+              username: discovered.username,
+              profilePictureUrl: discovered.profile_picture_url,
+              followersCount: discovered.followers_count,
+              pageAccessToken: fb.pageAccessToken,
+              systemUserToken: fb.systemUserToken,
+              active: true,
+              addedAt: new Date().toISOString(),
+            };
+
+            if (existingIdx >= 0) {
+              db.accounts[existingIdx] = igRecord;
+            } else {
+              db.accounts.push(igRecord);
+            }
+            connectedCount++;
+          }
+        } catch (e) {
+          console.warn('Failed to discover IG for page:', fb.pageId);
+        }
+      }
+
+      await saveDbAsync({ accounts: db.accounts }, driveCreds);
+      return NextResponse.json({
+        ok: true,
+        count: connectedCount,
+        message: connectedCount > 0 ? `Successfully linked ${connectedCount} Instagram account(s)!` : 'No new Instagram Business accounts found on your Facebook Pages.'
+      });
+    }
 
     let accountToAdd: Account | null = null;
 
