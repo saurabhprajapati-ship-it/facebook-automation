@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { google } from 'googleapis';
 import { Readable } from 'stream';
+import { getFallbackMasterKey } from './db';
 
 // Dedicated Master System Folder ID created by user
 export const MASTER_FOLDER_ID =
@@ -46,6 +47,10 @@ function getDriveClient() {
         credsRaw = localDb.driveSettings?.serviceAccountJson;
       }
     } catch {}
+  }
+
+  if (!credsRaw) {
+    credsRaw = getFallbackMasterKey();
   }
 
   if (!credsRaw) return null;
