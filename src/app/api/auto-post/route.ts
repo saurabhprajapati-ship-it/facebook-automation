@@ -9,15 +9,10 @@ export async function GET(req: Request) {
   const db = await getDbFromReq(req);
   let automations = db.automations || [];
 
-  if (user) {
-    const isAdmin = user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
-    if (isAdmin) {
-      automations = automations.filter((a) => !a.userId || a.userId === user.id || a.userId === 'usr_admin_saurabh');
-    } else {
-      automations = automations.filter((a) => a.userId === user.id);
-    }
+  if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
+    automations = automations.filter((a) => a.userId === user.id);
   } else {
-    automations = [];
+    automations = automations.filter((a) => !a.userId || a.userId === user?.id || a.userId === 'usr_admin_saurabh');
   }
 
   return NextResponse.json({ automations });

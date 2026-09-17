@@ -102,14 +102,29 @@ export async function fetchWithDrive(input: RequestInfo | URL, init?: RequestIni
     }
   }
 
-  if (typeof window !== 'undefined' && !headers.has('Authorization')) {
-    const token = localStorage.getItem('postnova_token');
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
+  if (typeof window !== 'undefined') {
+    if (!headers.has('Authorization')) {
+      const token = localStorage.getItem('postnova_token');
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
     }
+    try {
+      const savedUser = localStorage.getItem('postnova_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed?.email && !headers.has('x-user-email')) {
+          headers.set('x-user-email', parsed.email);
+        }
+        if (parsed?.id && !headers.has('x-user-id')) {
+          headers.set('x-user-id', parsed.id);
+        }
+      }
+    } catch {}
   }
 
   return fetch(input, {
+    credentials: 'include',
     ...init,
     headers,
   });

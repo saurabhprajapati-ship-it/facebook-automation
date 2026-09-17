@@ -19,8 +19,6 @@ export async function GET(req: Request) {
 
   if (user && !isAdmin) {
     settings = userDriveMap[user.id] || { status: 'disconnected' };
-  } else if (!user) {
-    settings = { status: 'disconnected' };
   }
 
   return NextResponse.json({

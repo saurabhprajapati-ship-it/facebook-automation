@@ -17,8 +17,6 @@ export async function GET(req: Request) {
   let settings = db.driveSettings;
   if (user && !isAdmin) {
     settings = userDriveMap[user.id] || undefined;
-  } else if (!user) {
-    settings = undefined;
   }
 
   if (!settings?.serviceAccountJson) {

@@ -12,15 +12,10 @@ export async function GET(req: Request) {
   const db = await getDbFromReq(req);
 
   let posts = db.posts || [];
-  if (user) {
-    const isAdmin = user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
-    if (isAdmin) {
-      posts = posts.filter((p) => !p.userId || p.userId === user.id || p.userId === 'usr_admin_saurabh');
-    } else {
-      posts = posts.filter((p) => p.userId === user.id);
-    }
+  if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
+    posts = posts.filter((p) => p.userId === user.id);
   } else {
-    posts = [];
+    posts = posts.filter((p) => !p.userId || p.userId === user?.id || p.userId === 'usr_admin_saurabh');
   }
 
   return NextResponse.json({ posts }, {

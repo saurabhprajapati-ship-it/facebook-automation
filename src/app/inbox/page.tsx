@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import AccountSelector from '@/components/AccountSelector';
 import { Account, AutoDmRule, AutoDmLog, AutoDmButton } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 
 export default function InboxDashboardPage() {
   const [activeTab, setActiveTab] = useState<'rules' | 'media' | 'logs' | 'story'>('rules');
@@ -70,7 +71,7 @@ export default function InboxDashboardPage() {
     try {
       setLoading(true);
       // Load rules & logs with fresh cache-busting
-      const res = await fetch(`/api/auto-dm/rules?t=${Date.now()}`, {
+      const res = await fetchWithDrive(`/api/auto-dm/rules?t=${Date.now()}`, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
       });
@@ -80,14 +81,14 @@ export default function InboxDashboardPage() {
       if (data.stats) setStats(data.stats);
 
       // Load all accounts (FB & IG)
-      const allRes = await fetch('/api/accounts');
+      const allRes = await fetchWithDrive('/api/accounts');
       const allData = await allRes.json();
       if (allData.accounts) {
         setAllAccounts(allData.accounts);
       }
 
       // Load Instagram accounts
-      const accRes = await fetch('/api/accounts/instagram');
+      const accRes = await fetchWithDrive('/api/accounts/instagram');
       const accData = await accRes.json();
       if (accData.accounts) {
         const onlyIg = accData.accounts.filter((a: any) => a.platform === 'instagram');
@@ -109,7 +110,7 @@ export default function InboxDashboardPage() {
     try {
       const id = accountId || targetAccountId || (igAccounts[0]?.id ?? '');
       if (!id) return;
-      const res = await fetch(`/api/auto-dm/media?accountId=${id}&t=${Date.now()}`);
+      const res = await fetchWithDrive(`/api/auto-dm/media?accountId=${id}&t=${Date.now()}`);
       const data = await res.json();
       if (data.media) {
         setMediaList(data.media);
@@ -137,7 +138,7 @@ export default function InboxDashboardPage() {
       setSecondsUntilNextScan((prev) => {
         if (prev <= 1) {
           // Trigger automated background scan
-          fetch('/api/auto-dm/run-now', { method: 'POST' })
+          fetchWithDrive('/api/auto-dm/run-now', { method: 'POST' })
             .then((r) => r.json())
             .then((data) => {
               setLastScanTime(
@@ -163,7 +164,7 @@ export default function InboxDashboardPage() {
     setSuccessMsg('');
 
     try {
-      const res = await fetch('/api/auto-dm/run-now', { method: 'POST' });
+      const res = await fetchWithDrive('/api/auto-dm/run-now', { method: 'POST' });
       const data = await res.json();
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Failed to scan comments');
@@ -180,7 +181,7 @@ export default function InboxDashboardPage() {
 
   const handleToggleRule = async (ruleId: string, currentStatus: boolean) => {
     try {
-      await fetch('/api/auto-dm/rules', {
+      await fetchWithDrive('/api/auto-dm/rules', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: ruleId, enabled: !currentStatus }),
@@ -194,7 +195,7 @@ export default function InboxDashboardPage() {
   const handleDeleteRule = async (ruleId: string) => {
     if (!confirm('Are you sure you want to delete this trigger rule?')) return;
     try {
-      await fetch(`/api/auto-dm/rules?id=${ruleId}`, { method: 'DELETE' });
+      await fetchWithDrive(`/api/auto-dm/rules?id=${ruleId}`, { method: 'DELETE' });
       loadData();
     } catch (err: any) {
       setErrorMsg(err.message);
@@ -275,7 +276,7 @@ export default function InboxDashboardPage() {
           url: b.url.trim(),
         }));
 
-      const res = await fetch('/api/auto-dm/rules', {
+      const res = await fetchWithDrive('/api/auto-dm/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -324,7 +325,7 @@ export default function InboxDashboardPage() {
     setSuccessMsg('');
 
     try {
-      const res = await fetch('/api/stories/publish', {
+      const res = await fetchWithDrive('/api/stories/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

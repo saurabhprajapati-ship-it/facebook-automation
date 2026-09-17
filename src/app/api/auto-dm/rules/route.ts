@@ -17,16 +17,14 @@ export async function GET(req: Request) {
     let rules = db.autoDmRules || [];
     let logs = db.autoDmLogs || [];
 
-    if (user) {
-      if (isAdmin) {
-        rules = rules.filter((r: any) => !r.userId || r.userId === user.id || r.userId === 'usr_admin_saurabh');
-      } else {
-        rules = rules.filter((r: any) => r.userId === user.id);
-        logs = logs.filter((l: any) => rules.some((r) => r.id === l.ruleId));
-      }
+    // If an explicit non-admin user is logged in, isolate to their own rules and logs
+    if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
+      rules = rules.filter((r: any) => r.userId === user.id);
+      logs = logs.filter((l: any) => rules.some((r) => r.id === l.ruleId));
     } else {
-      rules = [];
-      logs = [];
+      // Admin, default instance, or legacy: return all admin/main rules
+      rules = rules.filter((r: any) => !r.userId || r.userId === user?.id || r.userId === 'usr_admin_saurabh');
+      logs = logs.filter((l: any) => !l.userId || l.userId === user?.id || l.userId === 'usr_admin_saurabh');
     }
 
     return NextResponse.json(

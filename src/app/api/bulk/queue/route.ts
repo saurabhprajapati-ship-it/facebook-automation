@@ -15,15 +15,10 @@ export async function GET(req: Request) {
   const db = await getDbFromReq(req);
   let queue = db.scheduledQueue || [];
 
-  if (user) {
-    const isAdmin = user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
-    if (isAdmin) {
-      queue = queue.filter((q) => !q.userId || q.userId === user.id || q.userId === 'usr_admin_saurabh');
-    } else {
-      queue = queue.filter((q) => q.userId === user.id);
-    }
+  if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
+    queue = queue.filter((q) => q.userId === user.id);
   } else {
-    queue = [];
+    queue = queue.filter((q) => !q.userId || q.userId === user?.id || q.userId === 'usr_admin_saurabh');
   }
 
   const status = searchParams.get('status');

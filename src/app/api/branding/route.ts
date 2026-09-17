@@ -15,16 +15,12 @@ export async function GET(req: Request) {
 
   // Filter accounts by active user
   let userAccounts = db.accounts || [];
-  if (user) {
-    if (isAdmin) {
-      userAccounts = userAccounts.filter(
-        (a) => !a.userId || a.userId === user.id || a.userId === 'usr_admin_saurabh'
-      );
-    } else {
-      userAccounts = userAccounts.filter((a) => a.userId === user.id);
-    }
+  if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
+    userAccounts = userAccounts.filter((a) => a.userId === user.id);
   } else {
-    userAccounts = [];
+    userAccounts = userAccounts.filter(
+      (a) => !a.userId || a.userId === user?.id || a.userId === 'usr_admin_saurabh'
+    );
   }
 
   // User-specific branding

@@ -15,14 +15,10 @@ export async function GET(req: Request) {
     user?.id === 'usr_admin_saurabh';
 
   let keys = db.geminiKeys || [];
-  if (user) {
-    if (isAdmin) {
-      keys = keys.filter((k) => !k.userId || k.userId === user.id || k.userId === 'usr_admin_saurabh');
-    } else {
-      keys = keys.filter((k) => k.userId === user.id);
-    }
+  if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
+    keys = keys.filter((k) => k.userId === user.id);
   } else {
-    keys = [];
+    keys = keys.filter((k) => !k.userId || k.userId === user?.id || k.userId === 'usr_admin_saurabh');
   }
 
   // Return keys with masked value for security

@@ -11,18 +11,12 @@ export async function GET(req: Request) {
 
   let rawAccounts = db.accounts || [];
 
-  if (user) {
-    const isAdmin = user.role === 'admin' || user.email === 'saurabhprajapatidev@gmail.com' || user.id === 'usr_admin_saurabh';
-    if (isAdmin) {
-      // Admin sees admin accounts and legacy accounts
-      rawAccounts = rawAccounts.filter((a) => !a.userId || a.userId === user.id || a.userId === 'usr_admin_saurabh');
-    } else {
-      // Regular users only see their own accounts
-      rawAccounts = rawAccounts.filter((a) => a.userId === user.id);
-    }
+  // If an explicit non-admin user is logged in, isolate to their own accounts only
+  if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
+    rawAccounts = rawAccounts.filter((a) => a.userId === user.id);
   } else {
-    // If accessed without session, return empty
-    rawAccounts = [];
+    // Admin, default instance, or legacy: return all admin/main accounts
+    rawAccounts = rawAccounts.filter((a) => !a.userId || a.userId === user?.id || a.userId === 'usr_admin_saurabh');
   }
 
   const accountsWithPics = rawAccounts.map((acc) => {
