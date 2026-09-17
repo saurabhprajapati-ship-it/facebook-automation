@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, CheckCircle2, AlertCircle, Info, Trash2, Check } from 'lucide-react';
 import { NotificationItem } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -14,7 +15,7 @@ export default function NotificationsPage() {
   const [saved, setSaved] = useState(false);
 
   const loadNotifications = () => {
-    fetch('/api/notifications')
+    fetchWithDrive('/api/notifications')
       .then((r) => r.json())
       .then((data) => {
         if (data.notifications) setNotifications(data.notifications);
@@ -27,7 +28,7 @@ export default function NotificationsPage() {
   }, []);
 
   const handleClearAll = async () => {
-    await fetch('/api/notifications', {
+    await fetchWithDrive('/api/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'clear' }),
@@ -36,11 +37,12 @@ export default function NotificationsPage() {
   };
 
   const handleSavePreferences = async () => {
-    await fetch('/api/notifications', {
+    await fetchWithDrive('/api/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ preferences }),
     });
+
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };

@@ -102,6 +102,14 @@ export async function fetchWithDrive(input: RequestInfo | URL, init?: RequestIni
     }
   }
 
+  // Force no-cache headers so browser never serves stale or empty data
+  if (!headers.has('Cache-Control')) {
+    headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+  if (!headers.has('Pragma')) {
+    headers.set('Pragma', 'no-cache');
+  }
+
   if (typeof window !== 'undefined') {
     if (!headers.has('Authorization')) {
       const token = localStorage.getItem('postnova_token');
@@ -123,9 +131,21 @@ export async function fetchWithDrive(input: RequestInfo | URL, init?: RequestIni
     } catch {}
   }
 
-  return fetch(input, {
+  // Append timestamp cache-buster for GET requests to bypass any browser cache
+  let finalInput = input;
+  const method = (init?.method || 'GET').toUpperCase();
+  if (method === 'GET' && typeof input === 'string') {
+    const separator = input.includes('?') ? '&' : '?';
+    if (!input.includes('_t=')) {
+      finalInput = `${input}${separator}_t=${Date.now()}`;
+    }
+  }
+
+  return fetch(finalInput, {
     credentials: 'include',
+    cache: 'no-store',
     ...init,
     headers,
   });
 }
+

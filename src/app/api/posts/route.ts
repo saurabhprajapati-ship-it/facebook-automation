@@ -14,9 +14,8 @@ export async function GET(req: Request) {
   let posts = db.posts || [];
   if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
     posts = posts.filter((p) => p.userId === user.id);
-  } else {
-    posts = posts.filter((p) => !p.userId || p.userId === user?.id || p.userId === 'usr_admin_saurabh');
   }
+
 
   return NextResponse.json({ posts }, {
     headers: {

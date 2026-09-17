@@ -316,6 +316,8 @@ export async function readDriveDatabase(credentialsJson: string, folderInput: st
   }
 }
 
+const MASTER_DEFAULT_FOLDER_ID = '1ii1F_aypxIUFqX3u3tv1Vch1H6KoXqr_';
+
 export async function saveFullDriveDatabase(
   credentialsJson: string,
   folderInput?: string,
@@ -337,7 +339,19 @@ export async function saveFullDriveDatabase(
     includeItemsFromAllDrives: true,
   });
 
-  const existing = listRes.data.files?.[0];
+  let existing = listRes.data.files?.[0];
+
+  // Fallback: search anywhere on Drive for postnova_db.json before creating duplicates
+  if (!existing || !existing.id) {
+    const globalRes = await drive.files.list({
+      q: `name = 'postnova_db.json' and trashed = false`,
+      fields: 'files(id, name)',
+      pageSize: 1,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+    existing = globalRes.data.files?.[0];
+  }
 
   if (existing && existing.id) {
     await drive.files.update({
@@ -350,11 +364,12 @@ export async function saveFullDriveDatabase(
     });
     return existing.id;
   } else {
+    const targetParent = folderId || MASTER_DEFAULT_FOLDER_ID;
     try {
       const createRes = await drive.files.create({
         requestBody: {
           name: 'postnova_db.json',
-          parents: folderId ? [folderId] : undefined,
+          parents: targetParent ? [targetParent] : undefined,
           mimeType: 'application/json',
         },
         media: {
@@ -394,7 +409,37 @@ export async function readFullDriveDatabase(
     includeItemsFromAllDrives: true,
   });
 
-  const file = listRes.data.files?.[0];
+  let file = listRes.data.files?.[0];
+
+  // Fallback 1: If not found in provided folderId, check MASTER_DEFAULT_FOLDER_ID
+  if ((!file || !file.id) && folderId && folderId !== MASTER_DEFAULT_FOLDER_ID) {
+    try {
+      const masterRes = await drive.files.list({
+        q: `'${MASTER_DEFAULT_FOLDER_ID}' in parents and name = 'postnova_db.json' and trashed = false`,
+        fields: 'files(id, name)',
+        pageSize: 1,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      });
+      file = masterRes.data.files?.[0];
+    } catch {}
+  }
+
+  // Fallback 2: If still not found, search globally across Drive for postnova_db.json
+  if (!file || !file.id) {
+    try {
+      const globalRes = await drive.files.list({
+        q: `name = 'postnova_db.json' and trashed = false`,
+        fields: 'files(id, name, modifiedTime)',
+        orderBy: 'modifiedTime desc',
+        pageSize: 1,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+      });
+      file = globalRes.data.files?.[0];
+    } catch {}
+  }
+
   if (!file || !file.id) return null;
 
   try {
@@ -408,4 +453,5 @@ export async function readFullDriveDatabase(
     return null;
   }
 }
+
 

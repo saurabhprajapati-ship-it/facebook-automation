@@ -17,9 +17,8 @@ export async function GET(req: Request) {
 
   if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
     queue = queue.filter((q) => q.userId === user.id);
-  } else {
-    queue = queue.filter((q) => !q.userId || q.userId === user?.id || q.userId === 'usr_admin_saurabh');
   }
+
 
   const status = searchParams.get('status');
   if (status) {

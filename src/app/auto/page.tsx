@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Automation } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 
 export default function AutoPostListPage() {
   const [automations, setAutomations] = useState<Automation[]>([]);
@@ -22,7 +23,7 @@ export default function AutoPostListPage() {
   const [runResult, setRunResult] = useState<any | null>(null);
 
   const loadAutomations = () => {
-    fetch('/api/auto-post')
+    fetchWithDrive('/api/auto-post')
       .then((r) => r.json())
       .then((data) => {
         if (data.automations) setAutomations(data.automations);
@@ -34,7 +35,7 @@ export default function AutoPostListPage() {
   }, []);
 
   const handleToggle = async (id: string, currentEnabled: boolean) => {
-    await fetch('/api/auto-post', {
+    await fetchWithDrive('/api/auto-post', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, enabled: !currentEnabled }),
@@ -44,9 +45,10 @@ export default function AutoPostListPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this automation?')) return;
-    await fetch(`/api/auto-post?id=${id}`, { method: 'DELETE' });
+    await fetchWithDrive(`/api/auto-post?id=${id}`, { method: 'DELETE' });
     loadAutomations();
   };
+
 
   const handleRun = async (id: string, dryRun: boolean) => {
     setRunningId(id);

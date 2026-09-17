@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, Rss, ArrowLeft, Zap } from 'lucide-react';
 import { Account } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 import { InstagramIcon, FacebookIcon } from '@/components/BrandIcons';
 
 function NewAutoPostContent() {
@@ -36,7 +37,7 @@ function NewAutoPostContent() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    fetch('/api/accounts')
+    fetchWithDrive('/api/accounts')
       .then((r) => r.json())
       .then((data) => {
         if (data.accounts) {
@@ -54,10 +55,11 @@ function NewAutoPostContent() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auto-post', {
+      const res = await fetchWithDrive('/api/auto-post', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+
           name,
           kind: kind || 'ai',
           topic,

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { PenSquare, Send, Image as ImageIcon, Link as LinkIcon, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Account } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 import AccountSelector from '@/components/AccountSelector';
 
 export default function NewPostComposerPage() {
@@ -17,7 +18,7 @@ export default function NewPostComposerPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    fetch('/api/accounts')
+    fetchWithDrive('/api/accounts')
       .then((r) => r.json())
       .then((data) => {
         if (data.accounts?.length) {
@@ -44,9 +45,10 @@ export default function NewPostComposerPage() {
       }
 
       // Publish directly via official Facebook / Instagram publishing endpoint
-      const res = await fetch('/api/posts', {
+      const res = await fetchWithDrive('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+
         body: JSON.stringify({
           accountId: selectedAccountId,
           message,

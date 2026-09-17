@@ -37,8 +37,9 @@ export default function HomePage() {
 
   useEffect(() => {
     // Dynamic user session from /api/auth/me
-    fetch('/api/auth/me')
+    fetchWithDrive('/api/auth/me')
       .then((r) => r.json())
+
       .then((data) => {
         if (data.user?.name) {
           setUserName(data.user.name);

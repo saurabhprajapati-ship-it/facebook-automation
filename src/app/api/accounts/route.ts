@@ -14,10 +14,8 @@ export async function GET(req: Request) {
   // If an explicit non-admin user is logged in, isolate to their own accounts only
   if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
     rawAccounts = rawAccounts.filter((a) => a.userId === user.id);
-  } else {
-    // Admin, default instance, or legacy: return all admin/main accounts
-    rawAccounts = rawAccounts.filter((a) => !a.userId || a.userId === user?.id || a.userId === 'usr_admin_saurabh');
   }
+
 
   const accountsWithPics = rawAccounts.map((acc) => {
     if (acc.platform === 'facebook' && !acc.profilePictureUrl && acc.pageId) {

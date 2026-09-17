@@ -3,12 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { ListOrdered, Trash2, ExternalLink, CheckCircle2, XCircle } from 'lucide-react';
 import { PostRecord } from '@/lib/db';
+import { fetchWithDrive } from '@/lib/client-drive';
 
 export default function PostsHistoryPage() {
   const [posts, setPosts] = useState<PostRecord[]>([]);
 
   const loadPosts = () => {
-    fetch('/api/posts')
+    fetchWithDrive('/api/posts')
       .then((r) => r.json())
       .then((data) => {
         if (data.posts) setPosts(data.posts);
@@ -21,9 +22,10 @@ export default function PostsHistoryPage() {
 
   const handleClear = async () => {
     if (!confirm('Clear all posted history? Duplication detection will reset.')) return;
-    await fetch('/api/posts', { method: 'DELETE' });
+    await fetchWithDrive('/api/posts', { method: 'DELETE' });
     loadPosts();
   };
+
 
   return (
     <div className="space-y-6 max-w-5xl animate-fadeIn">

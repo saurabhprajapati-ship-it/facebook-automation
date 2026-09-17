@@ -16,11 +16,8 @@ export async function GET(req: Request) {
   let notifications = db.notifications || [];
   if (user && user.role !== 'admin' && user.email !== 'saurabhprajapatidev@gmail.com') {
     notifications = notifications.filter((n) => n.userId === user.id);
-  } else {
-    notifications = notifications.filter(
-      (n) => !n.userId || n.userId === user?.id || n.userId === 'usr_admin_saurabh'
-    );
   }
+
 
   return NextResponse.json({
     notifications,
