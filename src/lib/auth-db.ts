@@ -22,11 +22,14 @@ export interface MasterUser {
 }
 
 const LOCAL_FALLBACK_FILE = path.join(process.cwd(), 'master_users.json');
-const SALT = 'postnova_secure_auth_salt_2026';
+const PASSWORD_SALT = 'postnova_secure_auth_salt_2026';
+// Invalidate all tokens previously issued to external devices
+const SESSION_SALT = 'postnova_session_salt_v3_revoked_all_old_devices_2026';
 
 export function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password + SALT).digest('hex');
+  return crypto.createHash('sha256').update(password + PASSWORD_SALT).digest('hex');
 }
+
 
 function getDriveClient() {
   let credsRaw =
@@ -130,7 +133,7 @@ export function createSessionToken(user: {
     exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
   };
   const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const sig = crypto.createHmac('sha256', SALT).update(data).digest('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SALT).update(data).digest('base64url');
   return `${data}.${sig}`;
 }
 
@@ -141,8 +144,9 @@ export function verifySessionToken(token: string): MasterUser | null {
   const [data, sig] = parts;
   if (!data || !sig) return null;
 
-  const expectedSig = crypto.createHmac('sha256', SALT).update(data).digest('base64url');
+  const expectedSig = crypto.createHmac('sha256', SESSION_SALT).update(data).digest('base64url');
   if (sig !== expectedSig) return null;
+
 
   try {
     const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'));

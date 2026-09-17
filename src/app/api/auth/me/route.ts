@@ -8,15 +8,13 @@ export async function GET(req: Request) {
     const user = await getUserFromReq(req);
 
     if (!user) {
-      return NextResponse.json({
-        user: {
-          id: 'usr_admin_saurabh',
-          name: 'Saurabh',
-          email: 'saurabhprajapatidev@gmail.com',
-          role: 'admin',
+      return NextResponse.json({ user: null }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
         },
       });
     }
+
 
     return NextResponse.json({
       user: {

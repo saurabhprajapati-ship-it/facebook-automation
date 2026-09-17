@@ -27,36 +27,31 @@ import {
   GeminiIcon,
 } from '@/components/BrandIcons';
 import { Account, PostRecord } from '@/lib/db';
-import { fetchWithDrive } from '@/lib/client-drive';
+import { fetchWithDrive, clearAllUserDataOnLogout } from '@/lib/client-drive';
 
 export default function HomePage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [posts, setPosts] = useState<PostRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState('Saurabh');
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     // Dynamic user session from /api/auth/me
     fetchWithDrive('/api/auth/me')
       .then((r) => r.json())
-
       .then((data) => {
         if (data.user?.name) {
           setUserName(data.user.name);
           try {
             localStorage.setItem('postnova_user', JSON.stringify(data.user));
           } catch {}
+        } else if (!data.user) {
+          clearAllUserDataOnLogout();
+          window.location.href = '/login';
         }
       })
-      .catch(() => {
-        try {
-          const savedUser = localStorage.getItem('postnova_user');
-          if (savedUser) {
-            const parsed = JSON.parse(savedUser);
-            if (parsed?.name) setUserName(parsed.name);
-          }
-        } catch {}
-      });
+      .catch(() => {});
+
 
     Promise.all([
       fetchWithDrive('/api/accounts').then((r) => r.json()),

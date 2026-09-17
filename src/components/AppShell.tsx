@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -6,13 +6,47 @@ import { usePathname } from 'next/navigation';
 import { Menu, Bell } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import MobileNavBar from '@/components/MobileNavBar';
+import { clearAllUserDataOnLogout } from '@/lib/client-drive';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  const isLoginPage = pathname === '/login';
+  const isPublicPage =
+    pathname === '/login' ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/terms');
+
+  const [authChecked, setAuthChecked] = useState(isPublicPage);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    if (isPublicPage) {
+      setAuthChecked(true);
+      return;
+    }
+
+    fetch('/api/auth/me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.user) {
+          setIsAuthenticated(true);
+          setAuthChecked(true);
+        } else {
+          clearAllUserDataOnLogout();
+          setIsAuthenticated(false);
+          setAuthChecked(true);
+          window.location.href = '/login';
+        }
+      })
+      .catch(() => {
+        clearAllUserDataOnLogout();
+        setIsAuthenticated(false);
+        setAuthChecked(true);
+        window.location.href = '/login';
+      });
+  }, [pathname, isPublicPage]);
 
   // Automatically close mobile menu when navigating to another page
   useEffect(() => {
@@ -33,6 +67,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Check unread notifications count for mobile header badge
   useEffect(() => {
+    if (isPublicPage) return;
     fetch('/api/notifications')
       .then((res) => res.json())
       .then((data) => {
@@ -41,9 +76,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(() => {});
-  }, [pathname]);
+  }, [pathname, isPublicPage]);
 
-  if (isLoginPage) {
+  if (isPublicPage) {
     return (
       <main className="min-h-screen w-full flex items-center justify-center bg-cream-100 dark:bg-[#0d0f12] text-stone-900 dark:text-stone-100 transition-colors duration-200">
         {children}
@@ -51,8 +86,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (!authChecked || !isAuthenticated) {
+    return (
+      <main className="min-h-screen w-full flex flex-col items-center justify-center bg-cream-100 dark:bg-[#0d0f12] text-stone-900 dark:text-stone-100">
+        <div className="w-10 h-10 rounded-2xl bg-amber-500 flex items-center justify-center text-white font-black text-xl shadow-md animate-pulse mb-3">
+          ✦
+        </div>
+        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">Verifying session...</p>
+      </main>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full bg-cream-100 dark:bg-[#0d0f12] text-stone-900 dark:text-stone-100 transition-colors duration-200">
+
       {/* 1. TOP MOBILE APP BAR (Mobile & Tablet only) */}
       <header className="fixed top-0 left-0 right-0 h-14 z-30 lg:hidden bg-cream-50/95 dark:bg-stone-900/95 backdrop-blur-md border-b border-cream-200/90 dark:border-stone-800/90 px-4 flex items-center justify-between transition-colors duration-200">
         <div className="flex items-center gap-2.5">

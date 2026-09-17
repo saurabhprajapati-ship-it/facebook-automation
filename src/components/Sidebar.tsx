@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -52,9 +52,9 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentUser, setCurrentUser] = useState<{ name?: string; email?: string; role?: string; id?: string }>({
-    name: 'Saurabh',
-    email: 'saurabhprajapatidev@gmail.com',
-    role: 'admin',
+    name: '',
+    email: '',
+    role: '',
   });
 
   useEffect(() => {
@@ -79,17 +79,6 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       setIsDarkMode(false);
     }
 
-    // Initialize user immediately from localStorage to prevent any redirect flicker
-    try {
-      const savedUser = localStorage.getItem('postnova_user');
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        if (parsed?.name || parsed?.email) {
-          setCurrentUser(parsed);
-        }
-      }
-    } catch {}
-
     // User session verification from server
     fetch('/api/auth/me')
       .then((r) => r.json())
@@ -100,32 +89,22 @@ export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             localStorage.setItem('postnova_user', JSON.stringify(data.user));
           } catch {}
         } else {
-          try {
-            const saved = localStorage.getItem('postnova_user');
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (parsed?.email) {
-                setCurrentUser(parsed);
-                return;
-              }
-            }
-          } catch {}
-
-          if (pathname !== '/login') {
+          // If server says user is null, immediately wipe any leftover local storage & cookies
+          clearAllUserDataOnLogout();
+          setCurrentUser({});
+          if (pathname !== '/login' && !pathname.startsWith('/privacy') && !pathname.startsWith('/terms')) {
             window.location.href = '/login';
           }
         }
       })
       .catch(() => {
-        try {
-          const savedUser = localStorage.getItem('postnova_user');
-          if (savedUser) {
-            const parsed = JSON.parse(savedUser);
-            if (parsed?.name) setCurrentUser(parsed);
-          }
-        } catch {}
+        if (pathname !== '/login' && !pathname.startsWith('/privacy') && !pathname.startsWith('/terms')) {
+          clearAllUserDataOnLogout();
+          window.location.href = '/login';
+        }
       });
   }, [pathname]);
+
 
   const toggleTheme = () => {
     if (isDarkMode) {

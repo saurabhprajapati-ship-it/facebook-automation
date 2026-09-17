@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lock, Mail, User, ArrowRight, Loader2, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Lock, Mail, User, ArrowRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+
 
 export default function LoginPage() {
   const router = useRouter();
@@ -71,12 +72,8 @@ export default function LoginPage() {
     document.body.appendChild(script);
   }, []);
 
-  const handleQuickAdminLogin = () => {
-    setEmail('saurabhprajapatidev@gmail.com');
-    setPassword('admin123');
-  };
-
   const handleGoogleLogin = () => {
+
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -322,22 +319,9 @@ export default function LoginPage() {
             </svg>
             <span>Sign in with Google</span>
           </button>
-
-          {/* Quick Admin fill */}
-          {tab === 'login' && (
-            <div className="mt-5 pt-4 border-t border-cream-200 dark:border-stone-800 text-center">
-              <button
-                type="button"
-                onClick={handleQuickAdminLogin}
-                className="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline flex items-center justify-center gap-1 mx-auto"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>Quick-fill Admin Credentials (Saurabh)</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 }
+
