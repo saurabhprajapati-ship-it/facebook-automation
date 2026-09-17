@@ -11,6 +11,7 @@ import {
   sendInstagramPublicReply,
   publishInstagramFeedPost,
   uploadBufferToMetaCdn,
+  formatPersonalizedMessage,
 } from '@/lib/instagram';
 
 export async function GET(req: Request) {
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
 
 async function processAutoDmCron(db: ReturnType<typeof getDb>) {
   const rules = (db.autoDmRules || []).filter((r) => r.enabled);
-  if (!rules.length) return { rulesChecked: 0, dmsSent: 0 };
+  if (!rules.length) return { rulesChecked: 0, dmsSent: 0, logsAdded: 0 };
 
   let dmsSent = 0;
   const executionLogs: AutoDmLog[] = [];
@@ -54,6 +55,15 @@ async function processAutoDmCron(db: ReturnType<typeof getDb>) {
         for (const comment of comments) {
           if (processedSet.has(comment.id)) continue;
 
+          // Skip comments made by the page owner itself
+          if (
+            account.username &&
+            comment.username &&
+            comment.username.toLowerCase().trim() === account.username.toLowerCase().trim()
+          ) {
+            continue;
+          }
+
           const commentText = (comment.text || '').toLowerCase().trim();
           let matched = false;
           let matchedKeyword = '';
@@ -76,8 +86,8 @@ async function processAutoDmCron(db: ReturnType<typeof getDb>) {
             // Anti-ban human jitter (5000ms delay in cron)
             await new Promise((r) => setTimeout(r, 5000));
 
-            const personalized = rule.dmMessage.replace(/\{username\}/gi, `@${comment.username || 'friend'}`);
-            const dmRes = await sendInstagramPrivateReply(pageId, comment.id, personalized, token);
+            const personalized = formatPersonalizedMessage(rule.dmMessage, comment);
+            const dmRes = await sendInstagramPrivateReply(pageId, comment.id, personalized, token, rule.buttons);
 
             if (dmRes.ok) {
               dmsSent++;
@@ -87,7 +97,7 @@ async function processAutoDmCron(db: ReturnType<typeof getDb>) {
 
               let replyStatus: 'sent' | 'failed' | 'skipped' = 'skipped';
               if (rule.publicReplyMessage && rule.publicReplyMessage.trim()) {
-                const pubMsg = rule.publicReplyMessage.replace(/\{username\}/gi, `@${comment.username || 'friend'}`);
+                const pubMsg = formatPersonalizedMessage(rule.publicReplyMessage, comment);
                 const pubRes = await sendInstagramPublicReply(comment.id, pubMsg, token);
                 replyStatus = pubRes.ok ? 'sent' : 'failed';
               }
@@ -163,7 +173,7 @@ async function processAutoDmCron(db: ReturnType<typeof getDb>) {
     db.autoDmLogs = [...existing, ...executionLogs].slice(-200);
   }
 
-  return { rulesChecked: rules.length, dmsSent };
+  return { rulesChecked: rules.length, dmsSent, logsAdded: executionLogs.length };
 }
 
 async function handleCron(req: Request) {
@@ -184,7 +194,7 @@ async function handleCron(req: Request) {
 
   if (!dueItems.length) {
     // If auto-DMs were processed or logs were added, persist them
-    if (autoDmResult.dmsSent > 0 || (db.autoDmLogs && db.autoDmLogs.length > 0)) {
+    if (autoDmResult.dmsSent > 0 || (autoDmResult.logsAdded || 0) > 0) {
       await saveDbAsync({
         autoDmRules: db.autoDmRules,
         autoDmLogs: db.autoDmLogs,

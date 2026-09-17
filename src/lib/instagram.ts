@@ -39,6 +39,38 @@ export interface InstagramComment {
   };
 }
 
+export function formatPersonalizedMessage(
+  template: string,
+  comment: {
+    username?: string;
+    from?: { id?: string; username?: string; name?: string };
+  }
+): string {
+  if (!template) return '';
+
+  const rawUsername = comment.username || comment.from?.username || '';
+  const fullName = comment.from?.name || (rawUsername ? rawUsername.replace(/[._]/g, ' ') : 'friend');
+
+  let firstName = 'friend';
+  if (comment.from?.name) {
+    firstName = comment.from.name.trim().split(' ')[0];
+  } else if (rawUsername) {
+    const firstSegment = rawUsername.split(/[._\d]/)[0];
+    if (firstSegment && firstSegment.length >= 2) {
+      firstName = firstSegment.charAt(0).toUpperCase() + firstSegment.slice(1);
+    } else {
+      firstName = rawUsername;
+    }
+  }
+
+  const userHandle = rawUsername ? `@${rawUsername.replace(/^@/, '')}` : '@friend';
+
+  return template
+    .replace(/\{\{\s*first_name\s*\}\}|\{\s*first_name\s*\}/gi, firstName)
+    .replace(/\{\{\s*name\s*\}\}|\{\s*name\s*\}|\{\{\s*full_name\s*\}\}|\{\s*full_name\s*\}/gi, fullName)
+    .replace(/\{\{\s*username\s*\}\}|\{\s*username\s*\}/gi, userHandle);
+}
+
 export function explainInstagramError(body: any): string {
   const err = body?.error || {};
   const code = err.code;

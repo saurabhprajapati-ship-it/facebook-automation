@@ -5,6 +5,7 @@ import {
   fetchMediaComments,
   sendInstagramPrivateReply,
   sendInstagramPublicReply,
+  formatPersonalizedMessage,
 } from '@/lib/instagram';
 
 export const dynamic = 'force-dynamic';
@@ -103,19 +104,7 @@ export async function POST(req: Request) {
             // Anti-ban human jitter (3000ms delay)
             await new Promise((r) => setTimeout(r, 3000));
 
-            // Meta Personalized Placeholders (name, first_name, username)
-            const rawName = comment.from?.name || comment.username || 'friend';
-            const firstName = comment.from?.name ? comment.from.name.split(' ')[0] : (comment.username || 'friend');
-            const userHandle = `@${comment.username || 'friend'}`;
-
-            const formatPersonalizedText = (template: string) => {
-              return template
-                .replace(/(\{\{first_name\}\}|\{first_name\})/gi, firstName)
-                .replace(/(\{\{name\}\}|\{name\}|\{\{full_name\}\}|\{full_name\})/gi, rawName)
-                .replace(/(\{\{username\}\}|\{username\})/gi, userHandle);
-            };
-
-            const personalizedMessage = formatPersonalizedText(rule.dmMessage);
+            const personalizedMessage = formatPersonalizedMessage(rule.dmMessage, comment);
 
             // 1. Send Private Reply DM with Meta Button Template
             const dmRes = await sendInstagramPrivateReply(
@@ -136,7 +125,7 @@ export async function POST(req: Request) {
 
               // 2. Send Public Reply if configured
               if (rule.publicReplyMessage && rule.publicReplyMessage.trim()) {
-                const publicReplyText = formatPersonalizedText(rule.publicReplyMessage);
+                const publicReplyText = formatPersonalizedMessage(rule.publicReplyMessage, comment);
                 const pubRes = await sendInstagramPublicReply(comment.id, publicReplyText, token);
                 replyStatus = pubRes.ok ? 'sent' : 'failed';
               }
